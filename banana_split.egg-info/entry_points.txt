@@ -1,0 +1,2 @@
+[console_scripts]
+banana-split = banana_split.cli:main
