@@ -1,3 +1,5 @@
+<img src="logo.svg" alt="banana-split logo" width="72">
+
 # banana-split
 
 banana-split analyzes a large commit in a git repository and proposes a
