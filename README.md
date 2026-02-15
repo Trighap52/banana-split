@@ -128,7 +128,8 @@ This executes each corpus case in a fresh temporary clone and reports:
 - tree-equal success rate,
 - apply failure rate,
 - average suggested commit size (commits/case, hunks/commit, files/commit),
-- cohesion proxies (single-file ratio, single-symbol ratio, cohesion score).
+- cohesion proxies (single-file ratio, single-symbol ratio, cohesion score),
+- dependency-order satisfaction (source-before-test pairs satisfied).
 
 Use `--eval-output <path>` to write the full JSON report and
 `--eval-fail-on-case-failure` for CI-style non-zero exits when cases
@@ -167,6 +168,8 @@ Key ideas:
   and is validated to ensure:
   - every hunk appears in exactly one commit, and
   - per-file hunk order is preserved.
+- The planner preserves suggested commit order so semantic sequencing
+  (for example source-before-test) is retained when valid.
 - Applying a plan:
   - creates a new branch from the base commit,
   - replays partial patches using `git apply --cached`, and
@@ -189,3 +192,12 @@ uv run pytest tests/test_real_repo_integration.py
 
 This will clone the specified repository into a temporary directory and
 run banana-split against its `HEAD` commit.
+
+## Open source
+
+- License: `MIT` (see `LICENSE`)
+- Contributing guide: `CONTRIBUTING.md`
+- Code of conduct: `CODE_OF_CONDUCT.md`
+- Security policy: `SECURITY.md`
+- Support guide: `SUPPORT.md`
+- Changelog: `CHANGELOG.md`

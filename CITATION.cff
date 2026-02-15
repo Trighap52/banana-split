@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: banana-split
+message: "If you use banana-split in your work, please cite this project."
+type: software
+authors:
+  - name: banana-split contributors
+repository-code: "https://github.com/Trighap52/banana-split"
+license: MIT
