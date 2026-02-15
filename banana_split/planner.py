@@ -12,7 +12,6 @@ The planner is responsible for:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from .config import Config
 from .domain import Plan
@@ -21,6 +20,7 @@ from .ai.openai_client import OpenAIClient
 from .diff_parser import parse_unified_diff
 from .errors import PlanValidationError
 from .git_adapter import GitDiffResult, get_diff_for_commit, get_diff_for_staged
+from .preflight import validate_runtime_support
 from .review import review_plan
 from .apply import apply_plan
 
@@ -39,6 +39,7 @@ def build_plan(config: Config) -> Plan:
     diff = parse_unified_diff(git_diff.raw_diff)
     diff.base_commit = git_diff.base_commit
     diff.target_commit = git_diff.target_commit
+    validate_runtime_support(config, git_diff, diff)
 
     atomic_changes = group_hunks(diff)
 
@@ -173,4 +174,3 @@ def run_split(config: Config) -> None:
     reviewed_plan = review_plan(plan)
 
     apply_plan(reviewed_plan, config)
-

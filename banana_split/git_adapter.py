@@ -2,9 +2,7 @@
 Git integration for banana-split.
 
 This module is responsible for interacting with the git CLI to obtain
-diffs and to apply patches and create commits. At this scaffolding
-stage, the functions are stubs that will be implemented in detail
-later.
+diffs and to apply patches and create commits.
 """
 
 from __future__ import annotations
@@ -61,7 +59,10 @@ def _run_git(
 
     if completed.returncode != 0:
         LOG.debug("git stderr: %s", completed.stderr)
-        raise GitError(f"git command failed: {' '.join(cmd)}")
+        stderr = (completed.stderr or "").strip()
+        stdout = (completed.stdout or "").strip()
+        detail = stderr or stdout or "no command output"
+        raise GitError(f"git command failed: {' '.join(cmd)}: {detail}")
 
     return completed
 
@@ -136,12 +137,65 @@ def create_branch(name: str, start_point: str) -> None:
     _run_git(["branch", name, start_point])
 
 
+def delete_branch(name: str, force: bool = False) -> None:
+    """
+    Delete a local branch.
+    """
+
+    mode = "-D" if force else "-d"
+    _run_git(["branch", mode, name])
+
+
 def checkout(ref: str) -> None:
     """
     Check out the given ref.
     """
 
     _run_git(["checkout", ref])
+
+
+def get_current_ref() -> str:
+    """
+    Return the current branch name, or HEAD commit when detached.
+    """
+
+    cmd = ["git", "symbolic-ref", "--quiet", "--short", "HEAD"]
+    LOG.debug("Running git command: %s", " ".join(cmd))
+    completed = subprocess.run(
+        cmd,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode == 0:
+        branch = completed.stdout.strip()
+        if branch:
+            return branch
+    if completed.returncode not in (0, 1):
+        detail = (completed.stderr or "").strip() or "no command output"
+        raise GitError(f"git command failed: {' '.join(cmd)}: {detail}")
+
+    # Detached HEAD: fall back to the current commit hash.
+    return _run_git(["rev-parse", "HEAD"]).stdout.strip()
+
+
+def ensure_repo_clean() -> None:
+    """
+    Ensure there are no uncommitted changes before rewriting history.
+    """
+
+    status = _run_git(["status", "--porcelain"]).stdout
+    dirty = [line for line in status.splitlines() if line.strip()]
+    if not dirty:
+        return
+
+    preview = "; ".join(dirty[:3])
+    if len(dirty) > 3:
+        preview += "; ..."
+    raise GitError(
+        "repository has uncommitted changes; please commit/stash/clean before running "
+        f"banana-split ({preview})"
+    )
 
 
 def trees_equal(a: str, b: str) -> bool:
@@ -161,4 +215,5 @@ def trees_equal(a: str, b: str) -> bool:
         return True
     if completed.returncode == 1:
         return False
-    raise GitError(f"git diff failed: {' '.join(cmd)}")
+    detail = (completed.stderr or "").strip() or (completed.stdout or "").strip() or "no command output"
+    raise GitError(f"git diff failed: {' '.join(cmd)}: {detail}")

@@ -24,3 +24,6 @@ class PlanValidationError(BananaSplitError):
     """Raised when a generated plan violates core invariants."""
 
 
+class UnsupportedOperationError(BananaSplitError):
+    """Raised when a requested workflow is not yet supported safely."""
+

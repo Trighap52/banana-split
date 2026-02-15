@@ -21,6 +21,8 @@ This is an early prototype, but already supports:
 - Simple interactive review (rename commit titles).
 - Replaying the original commit as multiple commits on a new branch,
   verifying the final tree matches the original.
+- Preflight safety checks for unsupported diff shapes before mutating
+  history.
 
 AI integration is stubbed out (the interface exists, but no real model
 call yet).
@@ -97,8 +99,19 @@ uv run banana-split --staged --dry-run
 ```
 
 In this mode, banana-split uses the diff between `HEAD` and the index.
-Applying splits back to the repo is still evolving; for now the
-`--dry-run` mode is the safest way to explore suggested splits.
+Applying splits back to the repo is not supported yet for staged
+changes; banana-split will require `--dry-run` in this mode.
+
+### Current non-dry-run limits
+
+When creating split commits, banana-split currently rejects:
+
+- root commits (commits without a parent),
+- commits containing binary file changes,
+- rename-only changes (file moved/renamed without text hunks), and
+- mode-only changes (permission bit updates without text hunks).
+
+Use `--dry-run` to inspect plans for these cases.
 
 ## Design overview
 

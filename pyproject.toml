@@ -14,7 +14,7 @@ dependencies = []
 [project.scripts]
 banana-split = "banana_split.cli:main"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest",
 ]
