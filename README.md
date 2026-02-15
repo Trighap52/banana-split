@@ -17,6 +17,8 @@ This is an early prototype, but already supports:
 
 - Parsing git diffs into structured files / hunks / lines.
 - Grouping hunks into “atomic changes” per file and per symbol (function).
+- Semantic atomization with lightweight dependency ordering (for example,
+  source-before-test when signals match).
 - Building a plan of suggested commits.
 - Simple interactive review (rename commit titles).
 - Replaying the original commit as multiple commits on a new branch,
@@ -113,6 +115,33 @@ When creating split commits, banana-split currently rejects:
 
 Use `--dry-run` to inspect plans for these cases.
 
+## Evaluation harness
+
+To benchmark split quality over multiple repositories/commits, run:
+
+```bash
+uv run banana-split --eval-corpus examples/eval_corpus.sample.json
+```
+
+This executes each corpus case in a fresh temporary clone and reports:
+
+- tree-equal success rate,
+- apply failure rate,
+- average suggested commit size (commits/case, hunks/commit, files/commit),
+- cohesion proxies (single-file ratio, single-symbol ratio, cohesion score).
+
+Use `--eval-output <path>` to write the full JSON report and
+`--eval-fail-on-case-failure` for CI-style non-zero exits when cases
+fail.
+
+Corpus entries support:
+
+- `name` (optional display name),
+- `repo_url` (clone URL),
+- `target` (commit-ish, default `HEAD`),
+- `branch` (optional branch for clone), and
+- `clone_depth` (optional positive integer, default `200`).
+
 ## Design overview
 
 The main modules are:
@@ -126,13 +155,14 @@ The main modules are:
 - `banana_split.planner` – orchestrates analysis and plan construction.
 - `banana_split.review` – user-facing review and editing of plans.
 - `banana_split.apply` – applies a plan as actual git commits or a dry run.
+- `banana_split.eval` – corpus-driven benchmarking and quality metrics.
 
 Key ideas:
 
 - Diff parsing is separate from git calls, so you can test on raw diff
   strings.
-- Heuristics group hunks by file and by symbol (e.g., one commit per
-  function) before any AI involvement.
+- Heuristics group hunks by symbol and apply lightweight dependency
+  ordering before any AI involvement.
 - A `Plan` object describes the mapping from hunks to suggested commits
   and is validated to ensure:
   - every hunk appears in exactly one commit, and

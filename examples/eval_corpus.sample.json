@@ -1,0 +1,11 @@
+{
+  "cases": [
+    {
+      "name": "requests-head",
+      "repo_url": "https://github.com/psf/requests.git",
+      "target": "HEAD",
+      "branch": "main",
+      "clone_depth": 80
+    }
+  ]
+}
