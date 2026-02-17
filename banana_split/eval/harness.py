@@ -19,7 +19,7 @@ from typing import Any, Dict, Iterator, List, Optional, TextIO
 
 from ..apply import apply_plan
 from ..config import Config
-from ..domain import DiffHunk, Plan
+from ..domain import AtomicChange, DiffHunk, Plan
 from ..planner import build_plan
 
 
@@ -115,6 +115,8 @@ def run_evaluation(
     single_file_commit_count = 0
     single_symbol_commit_count = 0
     total_semantic_cohesion_score = 0.0
+    total_expected_dependency_pairs = 0
+    total_satisfied_dependency_pairs = 0
     planned_case_count = 0
 
     for case in cases:
@@ -150,6 +152,8 @@ def run_evaluation(
                     single_file_commit_count += metrics["single_file_commit_count"]
                     single_symbol_commit_count += metrics["single_symbol_commit_count"]
                     total_semantic_cohesion_score += metrics["semantic_cohesion_score_sum"]
+                    total_expected_dependency_pairs += metrics["expected_dependency_pairs"]
+                    total_satisfied_dependency_pairs += metrics["satisfied_dependency_pairs"]
 
                     apply_plan(plan, config)
 
@@ -202,6 +206,12 @@ def run_evaluation(
         "semantic_cohesion_score": _ratio(
             total_semantic_cohesion_score,
             total_suggested_commits,
+        ),
+        "expected_dependency_pairs": total_expected_dependency_pairs,
+        "satisfied_dependency_pairs": total_satisfied_dependency_pairs,
+        "dependency_order_satisfaction": _ratio(
+            total_satisfied_dependency_pairs,
+            total_expected_dependency_pairs,
         ),
     }
 
@@ -256,6 +266,12 @@ def print_evaluation_summary(report: Dict[str, Any], out: Optional[TextIO] = Non
             f"{summary['single_file_commit_ratio']:.3f} single-file ratio, "
             f"{summary['single_symbol_commit_ratio']:.3f} single-symbol ratio, "
             f"{summary['semantic_cohesion_score']:.3f} score"
+        ),
+        (
+            "Dependencies: "
+            f"{summary['satisfied_dependency_pairs']}/{summary['expected_dependency_pairs']} "
+            f"source-before-test pairs satisfied "
+            f"({summary['dependency_order_satisfaction']:.3f})"
         ),
     ]
     stream.write("\n".join(lines) + "\n")
@@ -319,8 +335,13 @@ def _plan_metrics(plan: Plan) -> Dict[str, Any]:
     single_file_commits = 0
     single_symbol_commits = 0
     cohesion_sum = 0.0
+    expected_dependency_pairs = 0
+    satisfied_dependency_pairs = 0
 
-    for commit in plan.suggested_commits:
+    atomic_by_id = {change.id: change for change in plan.atomic_changes}
+    commit_infos: List[Dict[str, Any]] = []
+
+    for index, commit in enumerate(plan.suggested_commits):
         hunks = [hunk_map[hid] for hid in commit.hunk_ids if hid in hunk_map]
         total_hunks += len(hunks)
 
@@ -344,6 +365,41 @@ def _plan_metrics(plan: Plan) -> Dict[str, Any]:
             cohesion += 0.5
         cohesion_sum += cohesion
 
+        tags = _collect_commit_tags(commit.atomic_change_ids, atomic_by_id)
+        if not tags:
+            tags = _derive_tags_from_hunks(hunks)
+        commit_infos.append(
+            {
+                "index": index,
+                "is_test": "test" in tags,
+                "symbol_tags": {tag for tag in tags if tag.startswith("symbol:")},
+                "module_tags": {tag for tag in tags if tag.startswith("module:")},
+            }
+        )
+
+    for test_commit in commit_infos:
+        if not test_commit["is_test"]:
+            continue
+
+        candidates: List[Dict[str, Any]] = []
+        if test_commit["symbol_tags"]:
+            candidates = [
+                info
+                for info in commit_infos
+                if not info["is_test"] and bool(info["symbol_tags"] & test_commit["symbol_tags"])
+            ]
+        if not candidates and test_commit["module_tags"]:
+            candidates = [
+                info
+                for info in commit_infos
+                if not info["is_test"] and bool(info["module_tags"] & test_commit["module_tags"])
+            ]
+
+        for source_commit in candidates:
+            expected_dependency_pairs += 1
+            if source_commit["index"] < test_commit["index"]:
+                satisfied_dependency_pairs += 1
+
     return {
         "suggested_commit_count": suggested_count,
         "total_hunks_in_suggested_commits": total_hunks,
@@ -351,4 +407,33 @@ def _plan_metrics(plan: Plan) -> Dict[str, Any]:
         "single_file_commit_count": single_file_commits,
         "single_symbol_commit_count": single_symbol_commits,
         "semantic_cohesion_score_sum": cohesion_sum,
+        "expected_dependency_pairs": expected_dependency_pairs,
+        "satisfied_dependency_pairs": satisfied_dependency_pairs,
+        "dependency_order_satisfaction": _ratio(
+            satisfied_dependency_pairs,
+            expected_dependency_pairs,
+        ),
     }
+
+
+def _collect_commit_tags(
+    atomic_change_ids: List[str],
+    atomic_by_id: Dict[str, AtomicChange],
+) -> set[str]:
+    tags: set[str] = set()
+    for change_id in atomic_change_ids:
+        change = atomic_by_id.get(change_id)
+        if not change:
+            continue
+        tags.update(change.tags)
+    return tags
+
+
+def _derive_tags_from_hunks(hunks: List[DiffHunk]) -> set[str]:
+    tags: set[str] = set()
+    for hunk in hunks:
+        symbol = hunk.meta.get("symbol")
+        if isinstance(symbol, str) and symbol.strip():
+            normalized = " ".join(symbol.strip().split()).lower()
+            tags.add(f"symbol:{normalized}")
+    return tags

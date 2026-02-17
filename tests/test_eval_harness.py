@@ -2,7 +2,15 @@ import json
 import subprocess
 from pathlib import Path
 
-from banana_split.domain import Diff, DiffHunk, DiffLine, FileDiff, Plan, SuggestedCommit
+from banana_split.domain import (
+    AtomicChange,
+    Diff,
+    DiffHunk,
+    DiffLine,
+    FileDiff,
+    Plan,
+    SuggestedCommit,
+)
 from banana_split.eval.harness import _plan_metrics, load_eval_corpus, run_evaluation
 
 
@@ -106,6 +114,95 @@ def test_plan_metrics_computes_size_and_cohesion():
     assert metrics["single_file_commit_count"] == 1
     assert metrics["single_symbol_commit_count"] == 1
     assert metrics["semantic_cohesion_score_sum"] == 1.0
+    assert metrics["expected_dependency_pairs"] == 0
+    assert metrics["satisfied_dependency_pairs"] == 0
+    assert metrics["dependency_order_satisfaction"] == 0.0
+
+
+def test_plan_metrics_dependency_order_satisfaction():
+    src_hunk = DiffHunk(
+        id="service.py::h0",
+        file_path="service.py",
+        header="@@ -1 +1 @@ def compute",
+        lines=[DiffLine(line_type="+", content="return 2")],
+        meta={"symbol": "def compute"},
+    )
+    test_hunk = DiffHunk(
+        id="tests/test_service.py::h0",
+        file_path="tests/test_service.py",
+        header="@@ -1 +1 @@ def test_compute",
+        lines=[DiffLine(line_type="+", content="assert compute() == 2")],
+        meta={"symbol": "def compute"},
+    )
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="service.py",
+                path_new="service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[src_hunk],
+            ),
+            FileDiff(
+                path_old="tests/test_service.py",
+                path_new="tests/test_service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[test_hunk],
+            ),
+        ],
+    )
+    atomic_changes = [
+        AtomicChange(
+            id="service.py::ac0",
+            hunk_ids=["service.py::h0"],
+            tags={"python", "module:service", "symbol:def compute", "path:service.py"},
+            summary="src",
+        ),
+        AtomicChange(
+            id="tests/test_service.py::ac0",
+            hunk_ids=["tests/test_service.py::h0"],
+            tags={
+                "python",
+                "test",
+                "module:service",
+                "symbol:def compute",
+                "path:tests/test_service.py",
+            },
+            summary="test",
+        ),
+    ]
+    plan = Plan(
+        diff=diff,
+        atomic_changes=atomic_changes,
+        # Intentionally reversed to simulate semantic-order violation.
+        suggested_commits=[
+            SuggestedCommit(
+                id="test",
+                title="test first",
+                body=None,
+                atomic_change_ids=["tests/test_service.py::ac0"],
+                hunk_ids=["tests/test_service.py::h0"],
+                estimated_risk=None,
+            ),
+            SuggestedCommit(
+                id="src",
+                title="src second",
+                body=None,
+                atomic_change_ids=["service.py::ac0"],
+                hunk_ids=["service.py::h0"],
+                estimated_risk=None,
+            ),
+        ],
+        invariants_checked=True,
+    )
+
+    metrics = _plan_metrics(plan)
+    assert metrics["expected_dependency_pairs"] == 1
+    assert metrics["satisfied_dependency_pairs"] == 0
+    assert metrics["dependency_order_satisfaction"] == 0.0
 
 
 def test_run_evaluation_on_local_repo(tmp_path):
