@@ -90,7 +90,7 @@ def _obtain_git_diff(config: Config) -> GitDiffResult:
 
 def _validate_and_order_plan(plan: Plan) -> None:
     """
-    Validate core invariants and ensure commits follow diff hunk order.
+    Validate core invariants while preserving suggested commit order.
 
     Invariants:
       - every hunk in the diff appears in exactly one suggested commit;
@@ -133,12 +133,6 @@ def _validate_and_order_plan(plan: Plan) -> None:
 
     if len(assigned_ids) != len(set(assigned_ids)):
         raise PlanValidationError("plan assigns at least one hunk to multiple commits")
-
-    # Order commits by the earliest hunk they contain to respect diff order.
-    plan.suggested_commits = sorted(
-        suggested_commits,
-        key=lambda c: min(hunk_order[hid] for hid in c.hunk_ids),
-    )
 
     # Verify per-file order is preserved across commits.
     for file in diff.files:

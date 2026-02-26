@@ -146,3 +146,70 @@ def test_validate_and_order_plan_detects_missing_hunk():
         assert "does not cover hunks exactly once" in message
     else:
         raise AssertionError("expected PlanValidationError to be raised")
+
+
+def test_validate_and_order_plan_preserves_cross_file_commit_order():
+    hunk_src = DiffHunk(
+        id="service.py::h0",
+        file_path="service.py",
+        header="@@ -1 +1 @@ def compute",
+        lines=[DiffLine(line_type="+", content="return 1", original_lineno=None, new_lineno=1)],
+    )
+    hunk_test = DiffHunk(
+        id="tests/test_service.py::h0",
+        file_path="tests/test_service.py",
+        header="@@ -1 +1 @@ def test_compute",
+        lines=[DiffLine(line_type="+", content="assert True", original_lineno=None, new_lineno=1)],
+    )
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="tests/test_service.py",
+                path_new="tests/test_service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[hunk_test],
+            ),
+            FileDiff(
+                path_old="service.py",
+                path_new="service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[hunk_src],
+            ),
+        ],
+    )
+    atomic_changes = [
+        AtomicChange(id="service.py::ac0", hunk_ids=["service.py::h0"]),
+        AtomicChange(id="tests/test_service.py::ac0", hunk_ids=["tests/test_service.py::h0"]),
+    ]
+    # Intentionally source-first even though test file appears first in diff.
+    suggested_commits = [
+        SuggestedCommit(
+            id="src",
+            title="Source change",
+            body=None,
+            atomic_change_ids=["service.py::ac0"],
+            hunk_ids=["service.py::h0"],
+            estimated_risk=None,
+        ),
+        SuggestedCommit(
+            id="test",
+            title="Test change",
+            body=None,
+            atomic_change_ids=["tests/test_service.py::ac0"],
+            hunk_ids=["tests/test_service.py::h0"],
+            estimated_risk=None,
+        ),
+    ]
+    plan = Plan(
+        diff=diff,
+        atomic_changes=atomic_changes,
+        suggested_commits=suggested_commits,
+        invariants_checked=False,
+    )
+
+    _validate_and_order_plan(plan)
+    assert [commit.id for commit in plan.suggested_commits] == ["src", "test"]
