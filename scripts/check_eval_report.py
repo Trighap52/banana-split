@@ -17,6 +17,14 @@ def _as_float(value: Any, field: str) -> float:
     raise ValueError(f"report summary field '{field}' must be numeric, got {type(value).__name__}")
 
 
+def _as_int(value: Any, field: str) -> int:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    raise ValueError(f"report summary field '{field}' must be an integer, got {type(value).__name__}")
+
+
 def _collect_failing_cases(report: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     cases = report.get("cases", [])
@@ -102,8 +110,26 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             raise SystemExit(str(exc)) from exc
 
+    expected_pairs: int | None = None
+    satisfied_pairs: int | None = None
+    if "expected_dependency_pairs" in summary:
+        try:
+            expected_pairs = _as_int(summary.get("expected_dependency_pairs"), "expected_dependency_pairs")
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit(str(exc)) from exc
+    if "satisfied_dependency_pairs" in summary:
+        try:
+            satisfied_pairs = _as_int(
+                summary.get("satisfied_dependency_pairs"),
+                "satisfied_dependency_pairs",
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit(str(exc)) from exc
+
     print(f"Eval report: {report_path}")
     print(f"tree_equal_success_rate={tree_equal:.3f} (required >= {args.min_tree_equal:.3f})")
+    if expected_pairs is not None and satisfied_pairs is not None:
+        print(f"dependency_pairs={satisfied_pairs}/{expected_pairs}")
     if args.min_dependency_order is not None:
         if dependency_order is None:
             raise SystemExit(

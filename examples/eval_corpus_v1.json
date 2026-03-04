@@ -88,22 +88,6 @@
       "rationale": "subtests: avoid double `saferepr()` (#14213). Touches source (src/_pytest/subtests.py) and tests (testing/test_subtests.py), with source-before-test diff order."
     },
     {
-      "name": "pytest-8950ca3bc098",
-      "repo_url": "https://github.com/pytest-dev/pytest.git",
-      "branch": "main",
-      "target": "8950ca3bc0988647dfc35b02f854347a1435bd36",
-      "clone_depth": 200,
-      "rationale": "subtests: fix inconcistent handling of non-string messages (#14196). Touches source (src/_pytest/unittest.py) and tests (testing/test_subtests.py), with source-before-test diff order."
-    },
-    {
-      "name": "pytest-966edc9d517c",
-      "repo_url": "https://github.com/pytest-dev/pytest.git",
-      "branch": "main",
-      "target": "966edc9d517cd092104028796b684fb1119a7c73",
-      "clone_depth": 200,
-      "rationale": "Fix: assertrepr_compare respects dict insertion order (#14050). Touches source (src/_pytest/_io/pprint.py) and tests (testing/io/test_saferepr.py), with source-before-test diff order."
-    },
-    {
       "name": "httpx-47f4a96ffaaa",
       "repo_url": "https://github.com/encode/httpx.git",
       "branch": "master",
@@ -128,44 +112,60 @@
       "rationale": "Cleanup changes to fix flag_value bug. Touches source (src/click/core.py) and tests (tests/test_options.py), with source-before-test diff order."
     },
     {
-      "name": "yarl-f30712383e7d",
-      "repo_url": "https://github.com/aio-libs/yarl.git",
-      "branch": "master",
-      "target": "f30712383e7d310f26fc9ee0dd07eda9d0b983fd",
+      "name": "pydantic-fad80bafc093",
+      "repo_url": "https://github.com/pydantic/pydantic.git",
+      "branch": "main",
+      "target": "fad80bafc0930ae7a23079e8ee4bcc8f3293566e",
+      "clone_depth": 210,
+      "rationale": "Require test suite to pass with free threading, switch back to global generic types cache (#12537). Touches source (pydantic/_internal/_generics.py) and tests (pydantic-core/tests/test_errors.py), with test-first diff order."
+    },
+    {
+      "name": "pydantic-c763adeba844",
+      "repo_url": "https://github.com/pydantic/pydantic.git",
+      "branch": "main",
+      "target": "c763adeba844eb45c7bbad30adf631559dfddc0b",
       "clone_depth": 200,
-      "rationale": "Add pydantic support (#1607). Touches source (yarl/_url.py) and tests (tests/test_pydantic.py), with test-first diff order."
+      "rationale": "Fix walrus operator precedence in `UrlConstraints.__get_pydantic_core_schema__()` (#12826). Touches source (pydantic/networks.py) and tests (tests/test_networks.py), with source-before-test diff order."
     },
     {
-      "name": "yarl-528f4390074b",
+      "name": "yarl-5c2af26b91e5",
       "repo_url": "https://github.com/aio-libs/yarl.git",
       "branch": "master",
-      "target": "528f4390074bc81ceb21eba44edaa964123f6477",
-      "clone_depth": 200,
-      "rationale": "Drop Python 3.9 to fix CI (#1609). Touches source (yarl/_parse.py) and tests (tests/test_quoting.py), with test-first diff order."
+      "target": "5c2af26b91e5d51ebdea2db5cc94aa324f6efb98",
+      "clone_depth": 300,
+      "rationale": "Small cleanups to `encode_url` (#1405). Touches source (yarl/_url.py) and tests (tests/test_url.py), with test-first diff order."
     },
     {
-      "name": "yarl-bf9f5ba94c60",
+      "name": "yarl-77ac632b8266",
       "repo_url": "https://github.com/aio-libs/yarl.git",
       "branch": "master",
-      "target": "bf9f5ba94c60d4d842bc30406e63417c2f3e8131",
-      "clone_depth": 200,
-      "rationale": ":bug: Raises meaningful exception when IPv6 URL is malformed (#1512). Touches source (yarl/_parse.py) and tests (tests/test_url.py), with test-first diff order."
+      "target": "77ac632b8266cfdb6b94f9546f5cbe03d37d5354",
+      "clone_depth": 343,
+      "rationale": "Extract staticmethods from URL object (#1353). Touches source (yarl/_url.py) and tests (tests/test_normalize_path.py), with test-first diff order."
     },
     {
-      "name": "yarl-1dc46ab5e5bc",
+      "name": "yarl-a9b4fd4af8fb",
       "repo_url": "https://github.com/aio-libs/yarl.git",
       "branch": "master",
-      "target": "1dc46ab5e5bc40a14ed1855c60d0b9f0d8951186",
-      "clone_depth": 216,
-      "rationale": "Fix `with_suffix` re-encoding entire name (#1468). Touches source (yarl/_url.py) and tests (tests/test_url.py), with test-first diff order."
+      "target": "a9b4fd4af8fbba8d62cd0d0f51c5f79eda3630ce",
+      "clone_depth": 1289,
+      "rationale": "Support quoting lists when used in mappings. Touches source (yarl/__init__.py) and tests (tests/test_update_query.py), with test-first diff order."
     },
     {
-      "name": "yarl-558e4b0aa64f",
+      "name": "yarl-4e43024f7bc5",
       "repo_url": "https://github.com/aio-libs/yarl.git",
       "branch": "master",
-      "target": "558e4b0aa64f722d1f45f4b70fdae0a89dcdacc8",
-      "clone_depth": 253,
-      "rationale": "Improve performance of path functions on cache miss (#1443). Touches source (yarl/_url.py) and tests (tests/test_url.py), with test-first diff order."
+      "target": "4e43024f7bc51b883502464e24c41e0707552ffa",
+      "clone_depth": 1448,
+      "rationale": "Disallow passing NoneType to URL.build (#276). Touches source (yarl/__init__.py) and tests (tests/test_url_build.py), with test-first diff order."
+    },
+    {
+      "name": "yarl-8fe668657806",
+      "repo_url": "https://github.com/aio-libs/yarl.git",
+      "branch": "master",
+      "target": "8fe668657806c95425a16f90b5bc6381f48056ae",
+      "clone_depth": 1452,
+      "rationale": "Support empty password in URL (#262). Touches source (yarl/__init__.py) and tests (tests/test_url.py), with test-first diff order."
     }
   ]
 }

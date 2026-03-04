@@ -22,6 +22,8 @@ def test_check_eval_report_passes_when_thresholds_are_met(tmp_path):
                 "summary": {
                     "tree_equal_success_rate": 1.0,
                     "dependency_order_satisfaction": 0.85,
+                    "expected_dependency_pairs": 20,
+                    "satisfied_dependency_pairs": 17,
                 },
                 "cases": [
                     {"name": "case-a", "status": "success", "tree_equal": True},
@@ -30,8 +32,9 @@ def test_check_eval_report_passes_when_thresholds_are_met(tmp_path):
         )
     )
 
-    proc = _run_gate(report_path, "--min-tree-equal", "1.0")
+    proc = _run_gate(report_path, "--min-tree-equal", "1.0", "--min-dependency-order", "0.8")
     assert proc.returncode == 0
+    assert "dependency_pairs=17/20" in proc.stdout
     assert "Quality gates passed." in proc.stdout
 
 
@@ -43,6 +46,8 @@ def test_check_eval_report_prints_failing_cases_for_tree_equality(tmp_path):
                 "summary": {
                     "tree_equal_success_rate": 0.8,
                     "dependency_order_satisfaction": 0.85,
+                    "expected_dependency_pairs": 20,
+                    "satisfied_dependency_pairs": 17,
                 },
                 "cases": [
                     {
@@ -62,3 +67,46 @@ def test_check_eval_report_prints_failing_cases_for_tree_equality(tmp_path):
     assert "Failing cases:" in proc.stdout
     assert "case-b (apply_failed): patch does not apply" in proc.stdout
     assert "tree_equal_success_rate below threshold" in proc.stdout
+
+
+def test_check_eval_report_fails_dependency_order_threshold(tmp_path):
+    report_path = tmp_path / "report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "tree_equal_success_rate": 1.0,
+                    "dependency_order_satisfaction": 0.75,
+                    "expected_dependency_pairs": 20,
+                    "satisfied_dependency_pairs": 15,
+                },
+                "cases": [
+                    {"name": "case-a", "status": "success", "tree_equal": True},
+                ],
+            }
+        )
+    )
+
+    proc = _run_gate(report_path, "--min-tree-equal", "1.0", "--min-dependency-order", "0.8")
+    assert proc.returncode == 1
+    assert "dependency_order_satisfaction below threshold" in proc.stdout
+
+
+def test_check_eval_report_requires_dependency_metric_when_gate_enabled(tmp_path):
+    report_path = tmp_path / "report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "tree_equal_success_rate": 1.0,
+                },
+                "cases": [
+                    {"name": "case-a", "status": "success", "tree_equal": True},
+                ],
+            }
+        )
+    )
+
+    proc = _run_gate(report_path, "--min-dependency-order", "0.8")
+    assert proc.returncode == 1
+    assert "does not include dependency_order_satisfaction" in proc.stderr

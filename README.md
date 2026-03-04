@@ -167,17 +167,24 @@ Validate corpus quality constraints with:
 make validate-eval-corpus EVAL_CORPUS=examples/eval_corpus_v1.json
 ```
 
-To enforce report quality gates locally (for example tree equality):
+To enforce report quality gates locally (tree equality and dependency
+ordering threshold):
 
 ```bash
-uv run python scripts/check_eval_report.py artifacts/eval-report.json --min-tree-equal 1.0
+uv run python scripts/check_eval_report.py artifacts/eval-report.json \
+  --min-tree-equal 1.0 \
+  --min-dependency-order 0.80
 ```
 
 CI integration:
 
 - `.github/workflows/eval.yml` runs the curated corpus benchmark on pull requests.
 - It uploads `artifacts/eval-report.json` as a build artifact.
-- It enforces a hard gate of `tree_equal_success_rate >= 1.0`.
+- It enforces hard gates:
+  - `tree_equal_success_rate >= 1.0`
+  - `dependency_order_satisfaction >= 0.80`
+- Gate output includes `satisfied_dependency_pairs` vs
+  `expected_dependency_pairs`.
 
 ## Design overview
 

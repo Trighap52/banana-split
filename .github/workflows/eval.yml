@@ -16,6 +16,9 @@ jobs:
     name: Eval Corpus (Python 3.11)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      MIN_TREE_EQUAL_SUCCESS_RATE: "1.0"
+      MIN_DEPENDENCY_ORDER_SATISFACTION: "0.80"
 
     steps:
       - name: Checkout
@@ -40,8 +43,11 @@ jobs:
       - name: Run eval benchmark
         run: make eval EVAL_CORPUS=examples/eval_corpus_v1.json EVAL_OUTPUT=artifacts/eval-report.json
 
-      - name: Enforce tree-equality gate
-        run: uv run python scripts/check_eval_report.py artifacts/eval-report.json --min-tree-equal 1.0
+      - name: Enforce eval quality gates
+        run: |
+          uv run python scripts/check_eval_report.py artifacts/eval-report.json \
+            --min-tree-equal "${MIN_TREE_EQUAL_SUCCESS_RATE}" \
+            --min-dependency-order "${MIN_DEPENDENCY_ORDER_SATISFACTION}"
 
       - name: Upload eval report artifact
         if: always()

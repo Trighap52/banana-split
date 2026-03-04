@@ -15,5 +15,7 @@ Versioning when stable releases begin.
 - Curated `examples/eval_corpus_v1.json` with 20 dependency-sensitive Python commits.
 - `scripts/validate_eval_corpus.py` to validate corpus quality constraints.
 - `Makefile` targets for local benchmark runs (`make eval`) and corpus validation.
-- GitHub Actions eval workflow with report artifact upload and tree-equality gate.
-- `scripts/check_eval_report.py` for enforcing eval quality thresholds.
+- GitHub Actions eval workflow with report artifact upload, tree-equality gate,
+  and dependency-order threshold gate (`>= 0.80`).
+- `scripts/check_eval_report.py` for enforcing eval quality thresholds and
+  reporting satisfied vs expected dependency pairs.
