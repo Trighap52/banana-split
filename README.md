@@ -2,6 +2,9 @@
 
 # banana-split
 
+[![CI](https://github.com/Trighap52/banana-split/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Trighap52/banana-split/actions/workflows/ci.yml)
+[![Eval](https://github.com/Trighap52/banana-split/actions/workflows/eval.yml/badge.svg?branch=main)](https://github.com/Trighap52/banana-split/actions/workflows/eval.yml)
+
 banana-split analyzes a large commit in a git repository and proposes a
 sequence of smaller, atomic commits that together reproduce the original
 change **without modifying any lines of code**. It only replays the
@@ -17,6 +20,7 @@ This is an early prototype, but already supports:
 
 - Parsing git diffs into structured files / hunks / lines.
 - Grouping hunks into “atomic changes” per file and per symbol (function).
+- AST-based Python symbol extraction with fallback to hunk-header symbols.
 - Semantic atomization with lightweight dependency ordering (for example,
   source-before-test when signals match).
 - Building a plan of suggested commits.

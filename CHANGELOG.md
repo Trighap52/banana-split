@@ -19,3 +19,6 @@ Versioning when stable releases begin.
   and dependency-order threshold gate (`>= 0.80`).
 - `scripts/check_eval_report.py` for enforcing eval quality thresholds and
   reporting satisfied vs expected dependency pairs.
+- AST-based Python symbol extraction for hunks, including methods, nested
+  scopes, and decorator-aware line mapping with safe fallback behavior.
+- GitHub Actions status badges (`CI`, `Eval`) in README.

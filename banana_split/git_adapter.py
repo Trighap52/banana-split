@@ -103,6 +103,28 @@ def get_diff_for_staged() -> GitDiffResult:
     return GitDiffResult(raw_diff=diff_output, base_commit=base, target_commit=None)
 
 
+def get_file_content_at_commit(commit: str, path: str) -> Optional[str]:
+    """
+    Return file content for `path` at `commit`, or None if unavailable.
+    """
+
+    try:
+        return _run_git(["show", f"{commit}:{path}"]).stdout
+    except GitError:
+        return None
+
+
+def get_staged_file_content(path: str) -> Optional[str]:
+    """
+    Return staged content for `path` from the index, or None if unavailable.
+    """
+
+    try:
+        return _run_git(["show", f":{path}"]).stdout
+    except GitError:
+        return None
+
+
 def apply_patch(patch: str, index_only: bool = False) -> None:
     """
     Apply a unified diff patch to the current repository.
