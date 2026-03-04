@@ -2,6 +2,9 @@
 
 # banana-split
 
+[![CI](https://github.com/Trighap52/banana-split/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Trighap52/banana-split/actions/workflows/ci.yml)
+[![Eval](https://github.com/Trighap52/banana-split/actions/workflows/eval.yml/badge.svg?branch=main)](https://github.com/Trighap52/banana-split/actions/workflows/eval.yml)
+
 banana-split analyzes a large commit in a git repository and proposes a
 sequence of smaller, atomic commits that together reproduce the original
 change **without modifying any lines of code**. It only replays the
@@ -17,6 +20,7 @@ This is an early prototype, but already supports:
 
 - Parsing git diffs into structured files / hunks / lines.
 - Grouping hunks into “atomic changes” per file and per symbol (function).
+- AST-based Python symbol extraction with fallback to hunk-header symbols.
 - Semantic atomization with lightweight dependency ordering (for example,
   source-before-test when signals match).
 - Building a plan of suggested commits.
@@ -120,7 +124,19 @@ Use `--dry-run` to inspect plans for these cases.
 To benchmark split quality over multiple repositories/commits, run:
 
 ```bash
-uv run banana-split --eval-corpus examples/eval_corpus.sample.json
+make eval EVAL_CORPUS=examples/eval_corpus.sample.json
+```
+
+The repository includes:
+
+- `examples/eval_corpus.sample.json` for quick smoke tests.
+- `examples/eval_corpus_v1.json` for a curated 20-case Python corpus
+  focused on source/test dependency-sensitive commits.
+
+Run the curated corpus with:
+
+```bash
+make eval EVAL_CORPUS=examples/eval_corpus_v1.json
 ```
 
 This executes each corpus case in a fresh temporary clone and reports:
@@ -135,6 +151,9 @@ Use `--eval-output <path>` to write the full JSON report and
 `--eval-fail-on-case-failure` for CI-style non-zero exits when cases
 fail.
 
+By default `make eval` writes `artifacts/eval-report.json`. Override
+with `EVAL_OUTPUT=<path>`.
+
 Corpus entries support:
 
 - `name` (optional display name),
@@ -142,6 +161,34 @@ Corpus entries support:
 - `target` (commit-ish, default `HEAD`),
 - `branch` (optional branch for clone), and
 - `clone_depth` (optional positive integer, default `200`).
+
+Curated corpus entries may also include descriptive metadata fields such
+as `rationale`; unknown fields are ignored by the loader.
+
+Validate corpus quality constraints with:
+
+```bash
+make validate-eval-corpus EVAL_CORPUS=examples/eval_corpus_v1.json
+```
+
+To enforce report quality gates locally (tree equality and dependency
+ordering threshold):
+
+```bash
+uv run python scripts/check_eval_report.py artifacts/eval-report.json \
+  --min-tree-equal 1.0 \
+  --min-dependency-order 0.80
+```
+
+CI integration:
+
+- `.github/workflows/eval.yml` runs the curated corpus benchmark on pull requests.
+- It uploads `artifacts/eval-report.json` as a build artifact.
+- It enforces hard gates:
+  - `tree_equal_success_rate >= 1.0`
+  - `dependency_order_satisfaction >= 0.80`
+- Gate output includes `satisfied_dependency_pairs` vs
+  `expected_dependency_pairs`.
 
 ## Design overview
 

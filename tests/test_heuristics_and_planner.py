@@ -8,7 +8,8 @@ from banana_split.domain import (
     Plan,
     SuggestedCommit,
 )
-from banana_split.planner import _validate_and_order_plan
+from banana_split.git_adapter import GitDiffResult
+from banana_split.planner import _enrich_python_hunk_symbols, _validate_and_order_plan
 from banana_split.errors import PlanValidationError
 
 
@@ -213,3 +214,85 @@ def test_validate_and_order_plan_preserves_cross_file_commit_order():
 
     _validate_and_order_plan(plan)
     assert [commit.id for commit in plan.suggested_commits] == ["src", "test"]
+
+
+def test_enrich_python_hunk_symbols_uses_ast_when_available(monkeypatch):
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="service.py",
+                path_new="service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    DiffHunk(
+                        id="service.py::h0",
+                        file_path="service.py",
+                        header="@@ -1,2 +1,2 @@ not a real symbol",
+                        lines=[
+                            DiffLine(line_type="-", content="def old_name():", original_lineno=1),
+                            DiffLine(line_type="+", content="def new_name():", new_lineno=1),
+                            DiffLine(line_type="-", content="    return 1", original_lineno=2),
+                            DiffLine(line_type="+", content="    return 2", new_lineno=2),
+                        ],
+                        meta={"language": "python", "symbol": "not a real symbol"},
+                    )
+                ],
+            )
+        ],
+    )
+    git_diff = GitDiffResult(raw_diff="", base_commit="base", target_commit="target")
+
+    monkeypatch.setattr(
+        "banana_split.planner.get_file_content_at_commit",
+        lambda commit, path: (
+            "def old_name():\n    return 1\n"
+            if commit == "base"
+            else "def new_name():\n    return 2\n"
+        ),
+    )
+    monkeypatch.setattr("banana_split.planner.get_staged_file_content", lambda path: None)
+
+    _enrich_python_hunk_symbols(diff=diff, git_diff=git_diff)
+
+    hunk = diff.files[0].hunks[0]
+    assert hunk.meta.get("symbol") == "def new_name"
+
+
+def test_enrich_python_hunk_symbols_falls_back_to_existing_symbol(monkeypatch):
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="service.py",
+                path_new="service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    DiffHunk(
+                        id="service.py::h0",
+                        file_path="service.py",
+                        header="@@ -1,1 +1,1 @@ def header_symbol",
+                        lines=[DiffLine(line_type="+", content="x = 1", new_lineno=1)],
+                        meta={"language": "python", "symbol": "def header_symbol"},
+                    )
+                ],
+            )
+        ],
+    )
+    git_diff = GitDiffResult(raw_diff="", base_commit="base", target_commit="target")
+
+    # Invalid Python source causes AST parsing to fail, so symbol should remain unchanged.
+    monkeypatch.setattr(
+        "banana_split.planner.get_file_content_at_commit",
+        lambda commit, path: "def broken(:\n    pass\n",
+    )
+    monkeypatch.setattr("banana_split.planner.get_staged_file_content", lambda path: None)
+
+    _enrich_python_hunk_symbols(diff=diff, git_diff=git_diff)
+
+    hunk = diff.files[0].hunks[0]
+    assert hunk.meta.get("symbol") == "def header_symbol"

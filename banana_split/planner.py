@@ -15,11 +15,18 @@ import logging
 
 from .config import Config
 from .domain import Plan
+from .analysis.language_intel import detect_language, extract_python_symbol_for_hunk
 from .analysis.heuristics import group_hunks
 from .ai.openai_client import OpenAIClient
 from .diff_parser import parse_unified_diff
 from .errors import PlanValidationError
-from .git_adapter import GitDiffResult, get_diff_for_commit, get_diff_for_staged
+from .git_adapter import (
+    GitDiffResult,
+    get_diff_for_commit,
+    get_diff_for_staged,
+    get_file_content_at_commit,
+    get_staged_file_content,
+)
 from .preflight import validate_runtime_support
 from .review import review_plan
 from .apply import apply_plan
@@ -40,6 +47,7 @@ def build_plan(config: Config) -> Plan:
     diff.base_commit = git_diff.base_commit
     diff.target_commit = git_diff.target_commit
     validate_runtime_support(config, git_diff, diff)
+    _enrich_python_hunk_symbols(diff=diff, git_diff=git_diff)
 
     atomic_changes = group_hunks(diff)
 
@@ -86,6 +94,54 @@ def _obtain_git_diff(config: Config) -> GitDiffResult:
     target = config.target or "HEAD"
     LOG.info("Using commit %s as diff source", target)
     return get_diff_for_commit(target)
+
+
+def _enrich_python_hunk_symbols(*, diff, git_diff: GitDiffResult) -> None:
+    """
+    Best-effort AST enrichment for Python hunk symbols.
+
+    If enrichment fails for any file/hunk, existing symbol metadata
+    (for example from hunk headers) remains unchanged.
+    """
+
+    for file in diff.files:
+        path_new = file.path_new
+        path_old = file.path_old
+        path_for_language = path_new or path_old or ""
+        if detect_language(path_for_language) != "python":
+            continue
+
+        new_source = _load_new_side_source(path_new=path_new, git_diff=git_diff)
+        old_source = _load_old_side_source(path_old=path_old, git_diff=git_diff)
+
+        if new_source is None and old_source is None:
+            continue
+
+        for hunk in file.hunks:
+            symbol = None
+            if new_source is not None:
+                symbol = extract_python_symbol_for_hunk(hunk, new_source, side="new")
+            if symbol is None and old_source is not None:
+                symbol = extract_python_symbol_for_hunk(hunk, old_source, side="old")
+            if symbol:
+                hunk.meta["symbol"] = symbol
+
+
+def _load_new_side_source(*, path_new: str | None, git_diff: GitDiffResult) -> str | None:
+    if not path_new:
+        return None
+
+    if git_diff.target_commit:
+        return get_file_content_at_commit(git_diff.target_commit, path_new)
+
+    # Staged mode: the new side is the index.
+    return get_staged_file_content(path_new)
+
+
+def _load_old_side_source(*, path_old: str | None, git_diff: GitDiffResult) -> str | None:
+    if not path_old or not git_diff.base_commit:
+        return None
+    return get_file_content_at_commit(git_diff.base_commit, path_old)
 
 
 def _validate_and_order_plan(plan: Plan) -> None:
