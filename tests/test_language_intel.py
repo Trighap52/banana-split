@@ -1,4 +1,5 @@
 from banana_split.analysis.language_intel import (
+    extract_python_import_modules,
     extract_python_symbol_for_hunk,
     extract_python_symbol_for_lines,
 )
@@ -88,3 +89,47 @@ def test_extract_python_symbol_for_hunk_supports_new_and_old_sides():
 
     assert symbol_new == "def new_name"
     assert symbol_old == "def old_name"
+
+
+def test_extract_python_import_modules_direct_import():
+    source = (
+        "import service\n"
+        "import pkg.service as svc\n"
+    )
+
+    modules = extract_python_import_modules(source)
+    assert "service" in modules
+    assert "pkg.service" in modules
+
+
+def test_extract_python_import_modules_from_import_and_alias():
+    source = (
+        "from service import run as run_service\n"
+        "from pkg import core as core_mod\n"
+    )
+
+    modules = extract_python_import_modules(source)
+    assert "service" in modules
+    assert "service.run" in modules
+    assert "pkg" in modules
+    assert "pkg.core" in modules
+
+
+def test_extract_python_import_modules_package_paths():
+    source = (
+        "from app.handlers.service import handle\n"
+    )
+
+    modules = extract_python_import_modules(source)
+    assert "app.handlers.service" in modules
+    assert "app.handlers.service.handle" in modules
+
+
+def test_extract_python_import_modules_ignores_relative_imports():
+    source = (
+        "from .service import run\n"
+        "from ..core import utils\n"
+    )
+
+    modules = extract_python_import_modules(source)
+    assert modules == set()

@@ -22,3 +22,6 @@ Versioning when stable releases begin.
 - AST-based Python symbol extraction for hunks, including methods, nested
   scopes, and decorator-aware line mapping with safe fallback behavior.
 - GitHub Actions status badges (`CI`, `Eval`) in README.
+- Import-based Python source-to-test dependency linking integrated into
+  semantic ordering, including support for direct imports, from-imports,
+  aliased imports, and package paths.

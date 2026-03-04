@@ -4,10 +4,17 @@ from banana_split.analysis.semantic_atomizer import atomize_semantically
 from banana_split.domain import Diff, DiffHunk, DiffLine, FileDiff
 
 
-def _hunk(hid: str, file_path: str, symbol: Optional[str] = None) -> DiffHunk:
+def _hunk(
+    hid: str,
+    file_path: str,
+    symbol: Optional[str] = None,
+    import_modules: Optional[list[str]] = None,
+) -> DiffHunk:
     meta = {}
     if symbol:
         meta["symbol"] = symbol
+    if import_modules:
+        meta["import_modules"] = import_modules
     return DiffHunk(
         id=hid,
         file_path=file_path,
@@ -97,3 +104,138 @@ def test_atomizer_module_fallback_orders_source_before_test():
     assert len(atomic_changes) == 2
     assert atomic_changes[0].id == "math.py::ac0"
     assert atomic_changes[1].id == "tests/test_math.py::ac0"
+
+
+def test_atomizer_import_link_direct_import_orders_source_before_test():
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="tests/test_service.py",
+                path_new="tests/test_service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    _hunk(
+                        "tests/test_service.py::h0",
+                        "tests/test_service.py",
+                        symbol=None,
+                        import_modules=["service"],
+                    )
+                ],
+            ),
+            FileDiff(
+                path_old="service.py",
+                path_new="service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[_hunk("service.py::h0", "service.py", symbol=None)],
+            ),
+        ],
+    )
+
+    atomic_changes = atomize_semantically(diff)
+    assert [change.id for change in atomic_changes] == ["service.py::ac0", "tests/test_service.py::ac0"]
+
+
+def test_atomizer_import_link_from_import_orders_source_before_test():
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="tests/test_worker.py",
+                path_new="tests/test_worker.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    _hunk(
+                        "tests/test_worker.py::h0",
+                        "tests/test_worker.py",
+                        symbol=None,
+                        import_modules=["worker", "worker.run"],
+                    )
+                ],
+            ),
+            FileDiff(
+                path_old="worker.py",
+                path_new="worker.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[_hunk("worker.py::h0", "worker.py", symbol=None)],
+            ),
+        ],
+    )
+
+    atomic_changes = atomize_semantically(diff)
+    assert [change.id for change in atomic_changes] == ["worker.py::ac0", "tests/test_worker.py::ac0"]
+
+
+def test_atomizer_import_link_aliased_import_orders_source_before_test():
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="tests/test_client.py",
+                path_new="tests/test_client.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    _hunk(
+                        "tests/test_client.py::h0",
+                        "tests/test_client.py",
+                        symbol=None,
+                        import_modules=["pkg.client"],
+                    )
+                ],
+            ),
+            FileDiff(
+                path_old="pkg/client.py",
+                path_new="pkg/client.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[_hunk("pkg/client.py::h0", "pkg/client.py", symbol=None)],
+            ),
+        ],
+    )
+
+    atomic_changes = atomize_semantically(diff)
+    assert [change.id for change in atomic_changes] == ["pkg/client.py::ac0", "tests/test_client.py::ac0"]
+
+
+def test_atomizer_import_link_package_path_orders_source_before_test():
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="tests/test_service_handler.py",
+                path_new="tests/test_service_handler.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    _hunk(
+                        "tests/test_service_handler.py::h0",
+                        "tests/test_service_handler.py",
+                        symbol=None,
+                        import_modules=["app.handlers.service", "app.handlers.service.handle"],
+                    )
+                ],
+            ),
+            FileDiff(
+                path_old="app/handlers/service.py",
+                path_new="app/handlers/service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[_hunk("app/handlers/service.py::h0", "app/handlers/service.py", symbol=None)],
+            ),
+        ],
+    )
+
+    atomic_changes = atomize_semantically(diff)
+    assert [change.id for change in atomic_changes] == [
+        "app/handlers/service.py::ac0",
+        "tests/test_service_handler.py::ac0",
+    ]

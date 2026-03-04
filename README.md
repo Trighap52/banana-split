@@ -23,6 +23,7 @@ This is an early prototype, but already supports:
 - AST-based Python symbol extraction with fallback to hunk-header symbols.
 - Semantic atomization with lightweight dependency ordering (for example,
   source-before-test when signals match).
+- Import-based source-to-test dependency linking for Python changes.
 - Building a plan of suggested commits.
 - Simple interactive review (rename commit titles).
 - Replaying the original commit as multiple commits on a new branch,
