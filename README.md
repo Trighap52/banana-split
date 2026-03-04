@@ -127,6 +127,12 @@ To benchmark split quality over multiple repositories/commits, run:
 make eval EVAL_CORPUS=examples/eval_corpus.sample.json
 ```
 
+For a faster smoke check against one case, use:
+
+```bash
+make eval-sample
+```
+
 The repository includes:
 
 - `examples/eval_corpus.sample.json` for quick smoke tests.
