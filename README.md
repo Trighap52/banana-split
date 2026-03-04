@@ -230,6 +230,12 @@ Run the test suite with:
 uv run pytest
 ```
 
+or:
+
+```bash
+make test
+```
+
 There is also an optional “real repo” integration test. To run it:
 
 ```bash
