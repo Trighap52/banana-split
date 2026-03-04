@@ -1,0 +1,52 @@
+name: Eval
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    name: Eval Corpus (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --group dev
+
+      - name: Validate curated corpus
+        run: make validate-eval-corpus EVAL_CORPUS=examples/eval_corpus_v1.json
+
+      - name: Run eval benchmark
+        run: make eval EVAL_CORPUS=examples/eval_corpus_v1.json EVAL_OUTPUT=artifacts/eval-report.json
+
+      - name: Enforce tree-equality gate
+        run: uv run python scripts/check_eval_report.py artifacts/eval-report.json --min-tree-equal 1.0
+
+      - name: Upload eval report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ github.run_id }}
+          path: artifacts/eval-report.json
+          if-no-files-found: error

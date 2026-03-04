@@ -1,0 +1,171 @@
+{
+  "version": "v1",
+  "description": "Dependency-sensitive Python evaluation corpus for semantic split quality.",
+  "criteria": {
+    "min_cases": 20,
+    "min_source_test_ratio": 0.7,
+    "min_test_first_cases": 5
+  },
+  "cases": [
+    {
+      "name": "pydantic-c449cae821e7",
+      "repo_url": "https://github.com/pydantic/pydantic.git",
+      "branch": "main",
+      "target": "c449cae821e758e8f8e584a50c63baec4f427c16",
+      "clone_depth": 200,
+      "rationale": "Do not re-use prebuilt serializers/validators on rebuilds (#12689). Touches source (pydantic/_internal/_model_construction.py) and tests (pydantic-core/tests/serializers/test_simple.py), with test-first diff order."
+    },
+    {
+      "name": "pydantic-246b1a94e684",
+      "repo_url": "https://github.com/pydantic/pydantic.git",
+      "branch": "main",
+      "target": "246b1a94e684868c5f05af192ba9544bb6c853ce",
+      "clone_depth": 206,
+      "rationale": "Run pydantic-core sources through `ruff` on `make lint` (#12524). Touches source (pydantic/networks.py) and tests (pydantic-core/tests/test_misc.py), with test-first diff order."
+    },
+    {
+      "name": "requests-47914226c296",
+      "repo_url": "https://github.com/psf/requests.git",
+      "branch": "main",
+      "target": "47914226c2968802f2cdee3f6f0f6e06e4472f64",
+      "clone_depth": 200,
+      "rationale": "Fix empty netrc entry usage (#7205). Touches source (src/requests/utils.py) and tests (tests/test_utils.py), with source-before-test diff order."
+    },
+    {
+      "name": "requests-5b4b64c3467f",
+      "repo_url": "https://github.com/psf/requests.git",
+      "branch": "main",
+      "target": "5b4b64c3467fd7a3c03f91ee641aaa348b6bed3b",
+      "clone_depth": 200,
+      "rationale": "Add more tests to prevent regression of CVE 2024 47081. Touches source (src/requests/utils.py) and tests (tests/test_utils.py), with source-before-test diff order."
+    },
+    {
+      "name": "flask-fbb6f0bc4c60",
+      "repo_url": "https://github.com/pallets/flask.git",
+      "branch": "main",
+      "target": "fbb6f0bc4c60a0bada0e03c3480d0ccf30a3c1df",
+      "clone_depth": 200,
+      "rationale": "all teardown callbacks are called despite errors. Touches source (src/flask/app.py) and tests (tests/test_appctx.py), with source-before-test diff order."
+    },
+    {
+      "name": "flask-c17f37939073",
+      "repo_url": "https://github.com/pallets/flask.git",
+      "branch": "main",
+      "target": "c17f379390731543eea33a570a47bd4ef76a54fa",
+      "clone_depth": 200,
+      "rationale": "request context tracks session access. Touches source (src/flask/app.py) and tests (tests/test_basic.py), with source-before-test diff order."
+    },
+    {
+      "name": "flask-e82db2ca3a22",
+      "repo_url": "https://github.com/pallets/flask.git",
+      "branch": "main",
+      "target": "e82db2ca3a22c9614c1987392c9cfaa8c6ce99ad",
+      "clone_depth": 200,
+      "rationale": "fix provide_automatic_options override. Touches source (src/flask/sansio/app.py) and tests (tests/test_basic.py), with source-before-test diff order."
+    },
+    {
+      "name": "pydantic-0967dd93002a",
+      "repo_url": "https://github.com/pydantic/pydantic.git",
+      "branch": "main",
+      "target": "0967dd93002a0e766440cf3b9c5004888ccf21ba",
+      "clone_depth": 200,
+      "rationale": "Ensure `__pydantic_private__` is set in `model_construct()` with user-defined `model_post_init()` (#12816). Touches source (pydantic/main.py) and tests (tests/test_main.py), with source-before-test diff order."
+    },
+    {
+      "name": "pydantic-a2fcb8ba1c6b",
+      "repo_url": "https://github.com/pydantic/pydantic.git",
+      "branch": "main",
+      "target": "a2fcb8ba1c6bd5c6f30236d7425f30ac588525eb",
+      "clone_depth": 200,
+      "rationale": "Respect `extras_schema` when only `extra_fields_behavior` is set on the config in JSON Schema generation for typed dictionaries (#12810). Touches source (pydantic/json_schema.py) and tests (tests/test_types_typeddict.py), with source-before-test diff order."
+    },
+    {
+      "name": "pytest-6b700f49fb59",
+      "repo_url": "https://github.com/pytest-dev/pytest.git",
+      "branch": "main",
+      "target": "6b700f49fb59fc6cec43b9a550cf558954d83332",
+      "clone_depth": 200,
+      "rationale": "subtests: avoid double `saferepr()` (#14213). Touches source (src/_pytest/subtests.py) and tests (testing/test_subtests.py), with source-before-test diff order."
+    },
+    {
+      "name": "pytest-8950ca3bc098",
+      "repo_url": "https://github.com/pytest-dev/pytest.git",
+      "branch": "main",
+      "target": "8950ca3bc0988647dfc35b02f854347a1435bd36",
+      "clone_depth": 200,
+      "rationale": "subtests: fix inconcistent handling of non-string messages (#14196). Touches source (src/_pytest/unittest.py) and tests (testing/test_subtests.py), with source-before-test diff order."
+    },
+    {
+      "name": "pytest-966edc9d517c",
+      "repo_url": "https://github.com/pytest-dev/pytest.git",
+      "branch": "main",
+      "target": "966edc9d517cd092104028796b684fb1119a7c73",
+      "clone_depth": 200,
+      "rationale": "Fix: assertrepr_compare respects dict insertion order (#14050). Touches source (src/_pytest/_io/pprint.py) and tests (testing/io/test_saferepr.py), with source-before-test diff order."
+    },
+    {
+      "name": "httpx-47f4a96ffaaa",
+      "repo_url": "https://github.com/encode/httpx.git",
+      "branch": "master",
+      "target": "47f4a96ffaaaa07dca1614409549b5d7a6e7af49",
+      "clone_depth": 200,
+      "rationale": "Handle empty zstd responses (#3412). Touches source (httpx/__version__.py) and tests (tests/test_decoders.py), with source-before-test diff order."
+    },
+    {
+      "name": "httpx-7b19cd5f4b74",
+      "repo_url": "https://github.com/encode/httpx.git",
+      "branch": "master",
+      "target": "7b19cd5f4b749064c6452892a5e58a3758da1d1b",
+      "clone_depth": 200,
+      "rationale": "Move utility functions from _utils.py to _client.py (#3389). Touches source (httpx/_client.py) and tests (tests/client/test_headers.py), with source-before-test diff order."
+    },
+    {
+      "name": "click-955ca492a6b9",
+      "repo_url": "https://github.com/pallets/click.git",
+      "branch": "main",
+      "target": "955ca492a6b9e8de0660dae1c415568ca6f9c4b3",
+      "clone_depth": 200,
+      "rationale": "Cleanup changes to fix flag_value bug. Touches source (src/click/core.py) and tests (tests/test_options.py), with source-before-test diff order."
+    },
+    {
+      "name": "yarl-f30712383e7d",
+      "repo_url": "https://github.com/aio-libs/yarl.git",
+      "branch": "master",
+      "target": "f30712383e7d310f26fc9ee0dd07eda9d0b983fd",
+      "clone_depth": 200,
+      "rationale": "Add pydantic support (#1607). Touches source (yarl/_url.py) and tests (tests/test_pydantic.py), with test-first diff order."
+    },
+    {
+      "name": "yarl-528f4390074b",
+      "repo_url": "https://github.com/aio-libs/yarl.git",
+      "branch": "master",
+      "target": "528f4390074bc81ceb21eba44edaa964123f6477",
+      "clone_depth": 200,
+      "rationale": "Drop Python 3.9 to fix CI (#1609). Touches source (yarl/_parse.py) and tests (tests/test_quoting.py), with test-first diff order."
+    },
+    {
+      "name": "yarl-bf9f5ba94c60",
+      "repo_url": "https://github.com/aio-libs/yarl.git",
+      "branch": "master",
+      "target": "bf9f5ba94c60d4d842bc30406e63417c2f3e8131",
+      "clone_depth": 200,
+      "rationale": ":bug: Raises meaningful exception when IPv6 URL is malformed (#1512). Touches source (yarl/_parse.py) and tests (tests/test_url.py), with test-first diff order."
+    },
+    {
+      "name": "yarl-1dc46ab5e5bc",
+      "repo_url": "https://github.com/aio-libs/yarl.git",
+      "branch": "master",
+      "target": "1dc46ab5e5bc40a14ed1855c60d0b9f0d8951186",
+      "clone_depth": 216,
+      "rationale": "Fix `with_suffix` re-encoding entire name (#1468). Touches source (yarl/_url.py) and tests (tests/test_url.py), with test-first diff order."
+    },
+    {
+      "name": "yarl-558e4b0aa64f",
+      "repo_url": "https://github.com/aio-libs/yarl.git",
+      "branch": "master",
+      "target": "558e4b0aa64f722d1f45f4b70fdae0a89dcdacc8",
+      "clone_depth": 253,
+      "rationale": "Improve performance of path functions on cache miss (#1443). Touches source (yarl/_url.py) and tests (tests/test_url.py), with test-first diff order."
+    }
+  ]
+}

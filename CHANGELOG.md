@@ -12,3 +12,8 @@ Versioning when stable releases begin.
 - Evaluation harness with corpus-driven metrics.
 - Semantic atomizer with lightweight dependency ordering.
 - Open source project community and governance baseline files.
+- Curated `examples/eval_corpus_v1.json` with 20 dependency-sensitive Python commits.
+- `scripts/validate_eval_corpus.py` to validate corpus quality constraints.
+- `Makefile` targets for local benchmark runs (`make eval`) and corpus validation.
+- GitHub Actions eval workflow with report artifact upload and tree-equality gate.
+- `scripts/check_eval_report.py` for enforcing eval quality thresholds.
