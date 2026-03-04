@@ -25,6 +25,7 @@ class _SemanticNode:
     id: str
     file_path: str
     symbol: Optional[str]
+    import_modules: Set[str]
     hunk_ids: List[str]
     tags: Set[str]
     summary: Optional[str]
@@ -43,11 +44,11 @@ def atomize_semantically(diff: Diff) -> List[AtomicChange]:
     """
 
     hunk_order = _build_hunk_order(diff)
-    nodes, by_file, by_symbol, by_module = _build_nodes(diff, hunk_order)
+    nodes, by_file, by_symbol, by_module, by_import_module = _build_nodes(diff, hunk_order)
     if not nodes:
         return []
 
-    edges = _build_dependencies(nodes, by_file, by_symbol, by_module)
+    edges = _build_dependencies(nodes, by_file, by_symbol, by_module, by_import_module)
     ordered_nodes = _topological_sort(nodes, edges)
 
     return [
@@ -79,11 +80,13 @@ def _build_nodes(
     Dict[str, List[_SemanticNode]],
     Dict[str, List[_SemanticNode]],
     Dict[str, List[_SemanticNode]],
+    Dict[str, List[_SemanticNode]],
 ]:
     nodes: List[_SemanticNode] = []
     by_file: Dict[str, List[_SemanticNode]] = {}
     by_symbol: Dict[str, List[_SemanticNode]] = {}
     by_module: Dict[str, List[_SemanticNode]] = {}
+    by_import_module: Dict[str, List[_SemanticNode]] = {}
 
     for file in diff.files:
         if not file.hunks:
@@ -116,10 +119,12 @@ def _build_nodes(
                 summary = f"Changes in {path} ({symbol})"
 
             first_order = min(hunk_order[hid] for hid in hunk_ids)
+            import_modules = _collect_import_modules(hunks)
             node = _SemanticNode(
                 id=f"{path}::ac{idx}",
                 file_path=path,
                 symbol=symbol,
+                import_modules=import_modules,
                 hunk_ids=hunk_ids,
                 tags=node_tags,
                 summary=summary,
@@ -135,9 +140,13 @@ def _build_nodes(
             if module_key:
                 by_module.setdefault(module_key, []).append(node)
 
+            if "test" not in node.tags:
+                for import_key in _module_import_keys_for_path(path):
+                    by_import_module.setdefault(import_key, []).append(node)
+
         by_file[path] = file_nodes
 
-    return nodes, by_file, by_symbol, by_module
+    return nodes, by_file, by_symbol, by_module, by_import_module
 
 
 def _group_hunks_by_symbol(hunks: List[DiffHunk]) -> List[Tuple[Optional[str], List[DiffHunk]]]:
@@ -163,6 +172,7 @@ def _build_dependencies(
     by_file: Dict[str, List[_SemanticNode]],
     by_symbol: Dict[str, List[_SemanticNode]],
     by_module: Dict[str, List[_SemanticNode]],
+    by_import_module: Dict[str, List[_SemanticNode]],
 ) -> Dict[str, Set[str]]:
     node_by_id = {node.id: node for node in nodes}
     edges: Dict[str, Set[str]] = {node.id: set() for node in nodes}
@@ -191,6 +201,16 @@ def _build_dependencies(
                 linked_sources.add(candidate.id)
 
         # If symbol signal is missing, fall back to module name linkage.
+        if not linked_sources:
+            for import_key in node.import_modules:
+                for candidate in by_import_module.get(import_key, []):
+                    if candidate.id == node.id:
+                        continue
+                    if "test" in candidate.tags:
+                        continue
+                    linked_sources.add(candidate.id)
+
+        # Last fallback: simple module-name linkage.
         if not linked_sources:
             module_key = _module_key(node.file_path)
             if module_key:
@@ -286,3 +306,56 @@ def _module_key(path: str) -> Optional[str]:
         lower = lower[: -len("_test")]
     return lower or None
 
+
+def _module_import_keys_for_path(path: str) -> Set[str]:
+    """
+    Build possible import keys for a Python file path.
+
+    Examples:
+      - "service.py" -> {"service"}
+      - "pkg/service.py" -> {"pkg.service", "service"}
+      - "pkg/__init__.py" -> {"pkg"}
+      - "src/app/service.py" -> {"app.service", "service"}
+    """
+
+    pure = Path(path)
+    if pure.suffix.lower() != ".py":
+        return set()
+
+    parts = list(pure.parts)
+    if not parts:
+        return set()
+
+    if parts[-1] == "__init__.py":
+        module_parts = parts[:-1]
+    else:
+        module_parts = [*parts[:-1], pure.stem]
+
+    if not module_parts:
+        return set()
+
+    # Drop common source roots for import-style keys.
+    if module_parts[0] in {"src", "lib"} and len(module_parts) > 1:
+        trimmed = module_parts[1:]
+    else:
+        trimmed = module_parts
+
+    candidates: Set[str] = set()
+    for seq in (module_parts, trimmed):
+        if seq:
+            candidates.add(".".join(seq))
+            candidates.add(seq[-1])
+    return {candidate for candidate in candidates if candidate}
+
+
+def _collect_import_modules(hunks: List[DiffHunk]) -> Set[str]:
+    modules: Set[str] = set()
+    for hunk in hunks:
+        raw = hunk.meta.get("import_modules")
+        if isinstance(raw, list):
+            for entry in raw:
+                if isinstance(entry, str) and entry.strip():
+                    modules.add(entry.strip())
+        elif isinstance(raw, str) and raw.strip():
+            modules.add(raw.strip())
+    return modules

@@ -9,7 +9,7 @@ from banana_split.domain import (
     SuggestedCommit,
 )
 from banana_split.git_adapter import GitDiffResult
-from banana_split.planner import _enrich_python_hunk_symbols, _validate_and_order_plan
+from banana_split.planner import _enrich_python_hunk_metadata, _validate_and_order_plan
 from banana_split.errors import PlanValidationError
 
 
@@ -216,7 +216,7 @@ def test_validate_and_order_plan_preserves_cross_file_commit_order():
     assert [commit.id for commit in plan.suggested_commits] == ["src", "test"]
 
 
-def test_enrich_python_hunk_symbols_uses_ast_when_available(monkeypatch):
+def test_enrich_python_hunk_metadata_uses_ast_when_available(monkeypatch):
     diff = Diff(
         base_commit="base",
         target_commit="target",
@@ -255,13 +255,14 @@ def test_enrich_python_hunk_symbols_uses_ast_when_available(monkeypatch):
     )
     monkeypatch.setattr("banana_split.planner.get_staged_file_content", lambda path: None)
 
-    _enrich_python_hunk_symbols(diff=diff, git_diff=git_diff)
+    _enrich_python_hunk_metadata(diff=diff, git_diff=git_diff)
 
     hunk = diff.files[0].hunks[0]
     assert hunk.meta.get("symbol") == "def new_name"
+    assert hunk.meta.get("import_modules") in (None, [])
 
 
-def test_enrich_python_hunk_symbols_falls_back_to_existing_symbol(monkeypatch):
+def test_enrich_python_hunk_metadata_falls_back_to_existing_symbol(monkeypatch):
     diff = Diff(
         base_commit="base",
         target_commit="target",
@@ -292,7 +293,52 @@ def test_enrich_python_hunk_symbols_falls_back_to_existing_symbol(monkeypatch):
     )
     monkeypatch.setattr("banana_split.planner.get_staged_file_content", lambda path: None)
 
-    _enrich_python_hunk_symbols(diff=diff, git_diff=git_diff)
+    _enrich_python_hunk_metadata(diff=diff, git_diff=git_diff)
 
     hunk = diff.files[0].hunks[0]
     assert hunk.meta.get("symbol") == "def header_symbol"
+
+
+def test_enrich_python_hunk_metadata_adds_import_modules(monkeypatch):
+    diff = Diff(
+        base_commit="base",
+        target_commit="target",
+        files=[
+            FileDiff(
+                path_old="tests/test_service.py",
+                path_new="tests/test_service.py",
+                change_type="modify",
+                is_binary=False,
+                hunks=[
+                    DiffHunk(
+                        id="tests/test_service.py::h0",
+                        file_path="tests/test_service.py",
+                        header="@@ -1,1 +1,1 @@",
+                        lines=[DiffLine(line_type="+", content="assert True", new_lineno=4)],
+                        meta={"language": "python"},
+                    )
+                ],
+            )
+        ],
+    )
+    git_diff = GitDiffResult(raw_diff="", base_commit="base", target_commit="target")
+
+    monkeypatch.setattr(
+        "banana_split.planner.get_file_content_at_commit",
+        lambda commit, path: (
+            "from app.service import run\n"
+            "import app.utils as utils\n"
+            "def test_run():\n"
+            "    assert run() is not None\n"
+        ),
+    )
+    monkeypatch.setattr("banana_split.planner.get_staged_file_content", lambda path: None)
+
+    _enrich_python_hunk_metadata(diff=diff, git_diff=git_diff)
+
+    hunk = diff.files[0].hunks[0]
+    modules = hunk.meta.get("import_modules")
+    assert isinstance(modules, list)
+    assert "app.service" in modules
+    assert "app.service.run" in modules
+    assert "app.utils" in modules

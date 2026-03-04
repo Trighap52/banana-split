@@ -136,6 +136,52 @@ def extract_python_symbol_for_lines(source: str, line_numbers: Iterable[int]) ->
     return best_symbol
 
 
+def extract_python_import_modules(source: str) -> set[str]:
+    """
+    Extract normalized module references imported by Python source.
+
+    Examples:
+      - `import pkg.service as svc` -> {"pkg.service"}
+      - `from pkg import service` -> {"pkg", "pkg.service"}
+      - `from pkg.service import run` -> {"pkg.service", "pkg.service.run"}
+    """
+
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return set()
+
+    modules: set[str] = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                normalized = _normalize_module_name(alias.name)
+                if normalized:
+                    modules.add(normalized)
+            continue
+
+        if isinstance(node, ast.ImportFrom):
+            # Relative imports (`from .foo import bar`) are omitted because
+            # resolving them reliably requires package context.
+            if node.level and node.level > 0:
+                continue
+
+            base = _normalize_module_name(node.module)
+            if not base:
+                continue
+            modules.add(base)
+
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                child = _normalize_module_name(f"{base}.{alias.name}")
+                if child:
+                    modules.add(child)
+
+    return modules
+
+
 def _collect_python_symbol_spans(tree: ast.AST) -> list[_PythonSymbolSpan]:
     spans: list[_PythonSymbolSpan] = []
     order_counter = 0
@@ -219,3 +265,10 @@ def _collect_line_numbers(hunk: DiffHunk, *, use_new: bool, changed_line_type: s
             numbers.append(lineno)
     return numbers
 
+
+def _normalize_module_name(name: Optional[str]) -> Optional[str]:
+    if not isinstance(name, str):
+        return None
+
+    normalized = ".".join(part.strip() for part in name.split(".") if part.strip())
+    return normalized or None

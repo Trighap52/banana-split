@@ -15,7 +15,11 @@ import logging
 
 from .config import Config
 from .domain import Plan
-from .analysis.language_intel import detect_language, extract_python_symbol_for_hunk
+from .analysis.language_intel import (
+    detect_language,
+    extract_python_import_modules,
+    extract_python_symbol_for_hunk,
+)
 from .analysis.heuristics import group_hunks
 from .ai.openai_client import OpenAIClient
 from .diff_parser import parse_unified_diff
@@ -47,7 +51,7 @@ def build_plan(config: Config) -> Plan:
     diff.base_commit = git_diff.base_commit
     diff.target_commit = git_diff.target_commit
     validate_runtime_support(config, git_diff, diff)
-    _enrich_python_hunk_symbols(diff=diff, git_diff=git_diff)
+    _enrich_python_hunk_metadata(diff=diff, git_diff=git_diff)
 
     atomic_changes = group_hunks(diff)
 
@@ -96,9 +100,9 @@ def _obtain_git_diff(config: Config) -> GitDiffResult:
     return get_diff_for_commit(target)
 
 
-def _enrich_python_hunk_symbols(*, diff, git_diff: GitDiffResult) -> None:
+def _enrich_python_hunk_metadata(*, diff, git_diff: GitDiffResult) -> None:
     """
-    Best-effort AST enrichment for Python hunk symbols.
+    Best-effort AST enrichment for Python hunk metadata.
 
     If enrichment fails for any file/hunk, existing symbol metadata
     (for example from hunk headers) remains unchanged.
@@ -117,6 +121,8 @@ def _enrich_python_hunk_symbols(*, diff, git_diff: GitDiffResult) -> None:
         if new_source is None and old_source is None:
             continue
 
+        import_modules = _collect_python_import_modules(new_source)
+
         for hunk in file.hunks:
             symbol = None
             if new_source is not None:
@@ -125,6 +131,8 @@ def _enrich_python_hunk_symbols(*, diff, git_diff: GitDiffResult) -> None:
                 symbol = extract_python_symbol_for_hunk(hunk, old_source, side="old")
             if symbol:
                 hunk.meta["symbol"] = symbol
+            if import_modules:
+                hunk.meta["import_modules"] = sorted(import_modules)
 
 
 def _load_new_side_source(*, path_new: str | None, git_diff: GitDiffResult) -> str | None:
@@ -142,6 +150,12 @@ def _load_old_side_source(*, path_old: str | None, git_diff: GitDiffResult) -> s
     if not path_old or not git_diff.base_commit:
         return None
     return get_file_content_at_commit(git_diff.base_commit, path_old)
+
+
+def _collect_python_import_modules(source: str | None) -> set[str]:
+    if not source:
+        return set()
+    return extract_python_import_modules(source)
 
 
 def _validate_and_order_plan(plan: Plan) -> None:
