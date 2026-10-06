@@ -100,7 +100,7 @@ def extract_python_symbol_for_lines(source: str, line_numbers: Iterable[int]) ->
 
     try:
         tree = ast.parse(source)
-    except (SyntaxError, ValueError):
+    except (SyntaxError, ValueError, UnicodeError):
         return None
 
     spans = _collect_python_symbol_spans(tree)
@@ -148,7 +148,7 @@ def extract_python_import_modules(source: str) -> set[str]:
 
     try:
         tree = ast.parse(source)
-    except (SyntaxError, ValueError):
+    except (SyntaxError, ValueError, UnicodeError):
         return set()
 
     modules: set[str] = set()

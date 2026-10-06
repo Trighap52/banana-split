@@ -60,10 +60,11 @@ CLI flag is a stub and must be removed or clearly identified before v1.
 
 ## Known limitations to resolve
 
-The existing parser drops newline markers and file metadata. Local inspection
-also reproduced ordinary file-addition failures and deletions rendered as empty
-files. These belong to #25. A final tree check can catch replay defects, but the
-v1 support matrix must reject unsupported inputs earlier.
+Replay fixtures now cover newline markers, CRLF, non-UTF-8 text, quoted paths,
+empty files, renames and permissions. Separate file operations with overlapping
+paths (such as directory replacements) remain explicitly unsupported until
+composite operations can be grouped safely. A final tree check is a backstop;
+the support matrix must reject unsupported inputs before replay.
 
 SIGKILL and power loss cannot run Python cleanup. Document recovery for orphaned
 temporary worktrees. Respect user hooks and report their failures; do not claim
