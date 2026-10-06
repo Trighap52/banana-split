@@ -63,19 +63,32 @@ def test_cli_splits_commit_in_temporary_repo(tmp_path):
         _run_git(["rev-parse", "HEAD^"], cwd=repo).stdout.strip()
     )
 
+    original_branch = _run_git(["symbolic-ref", "--short", "HEAD"], cwd=repo).stdout.strip()
+    original_files = (repo / "foo.py").read_bytes()
+    original_index = (repo / ".git" / "index").read_bytes()
+
     # Run the CLI as a module in a subprocess, pointing PYTHONPATH at the
     # project root so the package can be imported from the temporary repo.
     project_root = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(project_root)
 
-    subprocess.run(
+    result = subprocess.run(
         [sys.executable, "-m", "banana_split.cli", orig_head],
         cwd=str(repo),
         env=env,
         text=True,
+        capture_output=True,
         check=True,
     )
+
+    assert "Plan contains" in result.stdout
+    assert "Created banana-split/" in result.stdout
+    assert _run_git(["rev-parse", "HEAD"], cwd=repo).stdout.strip() == orig_head
+    assert _run_git(["symbolic-ref", "--short", "HEAD"], cwd=repo).stdout.strip() == original_branch
+    assert (repo / "foo.py").read_bytes() == original_files
+    assert (repo / ".git" / "index").read_bytes() == original_index
+    assert _run_git(["status", "--porcelain"], cwd=repo).stdout.strip() == ""
 
     split_branch = f"banana-split/split-{orig_head[:7]}"
 

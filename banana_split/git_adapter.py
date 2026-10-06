@@ -125,30 +125,32 @@ def get_staged_file_content(path: str) -> Optional[str]:
         return None
 
 
-def apply_patch(patch: str, index_only: bool = False) -> None:
+def apply_patch(patch: str, index_only: bool = False, *, cwd: Optional[str] = None) -> None:
     """
-    Apply a unified diff patch to the current repository.
+    Apply a unified diff patch in the selected repository.
 
-    When index_only is True, the patch is applied to the index without
-    touching the working tree.
+    By default, update both the index and working tree. When index_only
+    is True, update only the index.
     """
 
     args = ["apply"]
     if index_only:
         # Update the index only; leave the working tree unchanged.
         args.append("--cached")
+    else:
+        args.append("--index")
 
     # Feed the patch via stdin. We rely on git to validate the patch and
     # will raise GitError if it fails.
-    _run_git(args, cwd=None, input_text=patch)
+    _run_git(args, cwd=cwd, input_text=patch)
 
 
-def create_commit(message: str) -> None:
+def create_commit(message: str, *, cwd: Optional[str] = None) -> None:
     """
     Create a git commit with the given commit message.
     """
 
-    _run_git(["commit", "-m", message])
+    _run_git(["commit", "-m", message], cwd=cwd)
 
 
 def create_branch(name: str, start_point: str) -> None:
@@ -206,7 +208,8 @@ def ensure_repo_clean() -> None:
     Ensure there are no uncommitted changes before rewriting history.
     """
 
-    status = _run_git(["status", "--porcelain"]).stdout
+    # Read status without refreshing/writing the caller's index.
+    status = _run_git(["--no-optional-locks", "status", "--porcelain"]).stdout
     dirty = [line for line in status.splitlines() if line.strip()]
     if not dirty:
         return

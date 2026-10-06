@@ -34,6 +34,8 @@ This is an early prototype, but already supports:
 AI integration is stubbed out (the interface exists, but no real model
 call yet).
 
+The v1 delivery roadmap is tracked in [issue #23](https://github.com/Trighap52/banana-split/issues/23).
+
 ## Installation
 
 banana-split is managed via [`uv`](https://github.com/astral-sh/uv).
@@ -62,9 +64,9 @@ banana-split --help
 
 ## Basic usage
 
-> Always run banana-split on a branch you are comfortable rewriting.
-> The tool itself creates a new branch for the split commits, but it is
-> good practice to work on throwaway branches while experimenting.
+> Run from a clean repository. Split commits are built in an isolated temporary
+> worktree, then published on a new branch after verification. Your current
+> branch, index, and working files remain unchanged.
 
 ### Split a specific commit
 
@@ -79,23 +81,29 @@ banana-split will:
 - Inspect the diff between `<commit-sha>` and its parent.
 - Propose a series of smaller commits.
 - Ask if you want to rename commit titles.
-- Create a new branch called:
-  - `banana-split/split-<short-sha>`
-- Replay the original diff as multiple commits on that branch.
-- Verify that the final tree matches `<commit-sha>` exactly.
+- Replay the original diff in a detached temporary worktree.
+- Verify that the final tree object matches `<commit-sha>` exactly.
+- Remove the temporary worktree and create `banana-split/split-<short-sha>`.
 
-Your original branch and commit remain unchanged.
+Your current checkout, original branch, and commit remain unchanged. To inspect
+the result, explicitly check out the printed output branch. Existing output
+branches are never overwritten.
+
+Ctrl+C during review or replay aborts the operation. Replay failures clean up
+the temporary worktree without publishing a branch. If cleanup itself fails,
+the error includes the recovery path. Non-interactive runs currently apply
+the displayed plan directly; explicit plan/apply commands are tracked for v1.
 
 ### Dry-run (no git changes)
 
 To see what banana-split would do without touching history:
 
 ```bash
-uv run banana-split <commit-sha> --dry-run -v
+uv run banana-split <commit-sha> --dry-run
 ```
 
-This prints a summary of the proposed commits and their hunks instead of
-creating any branches or commits.
+This prints a summary at default verbosity without prompting or creating
+any branches or commits.
 
 ### Split staged changes (experimental)
 
@@ -225,9 +233,10 @@ Key ideas:
 - The planner preserves suggested commit order so semantic sequencing
   (for example source-before-test) is retained when valid.
 - Applying a plan:
-  - creates a new branch from the base commit,
-  - replays partial patches using `git apply --cached`, and
-  - checks the final tree against the original commit.
+  - revalidates the reviewed plan,
+  - replays partial patches using `git apply --index` in a detached worktree,
+  - compares the final tree object ID with the original commit, and
+  - removes the worktree before publishing the output branch.
 
 ## Development
 
