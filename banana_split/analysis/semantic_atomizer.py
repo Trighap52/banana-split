@@ -97,7 +97,7 @@ def _build_nodes(
             continue
 
         tags = _base_tags_for_path(path)
-        groups = _group_hunks_by_symbol(file.hunks)
+        groups = [(None, file.hunks)] if file.indivisible else _group_hunks_by_symbol(file.hunks)
         file_nodes: List[_SemanticNode] = []
 
         for idx, (symbol, hunks) in enumerate(groups):

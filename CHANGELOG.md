@@ -25,3 +25,15 @@ Versioning when stable releases begin.
 - Import-based Python source-to-test dependency linking integrated into
   semantic ordering, including support for direct imports, from-imports,
   aliased imports, and package paths.
+
+### Fixed
+
+- Preserve exact patch bodies, CRLF, non-UTF-8 contents, missing-final-newline
+  markers, quoted paths, and file-operation metadata during replay.
+- Replay additions, deletions, empty files, renames, and permission changes
+  as indivisible units, including operations with text edits.
+- Adjust later hunk ranges to account for previously applied split commits.
+- Reject merge, binary, submodule, and symlink changes before replay, and
+  compute root-commit previews against the empty tree.
+- Obtain machine-readable Git patches independently of local diff display
+  settings, external diff tools, and text conversion.

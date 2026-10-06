@@ -124,6 +124,8 @@ def _enrich_python_hunk_metadata(*, diff, git_diff: GitDiffResult) -> None:
         import_modules = _collect_python_import_modules(new_source)
 
         for hunk in file.hunks:
+            if hunk.meta.get("file_operation"):
+                continue
             symbol = None
             if new_source is not None:
                 symbol = extract_python_symbol_for_hunk(hunk, new_source, side="new")
@@ -203,6 +205,14 @@ def _validate_and_order_plan(plan: Plan) -> None:
 
     if len(assigned_ids) != len(set(assigned_ids)):
         raise PlanValidationError("plan assigns at least one hunk to multiple commits")
+
+    # File operations (rename/mode/add/delete) must be selected in one commit.
+    for file in diff.files:
+        if file.indivisible:
+            owners = [commit for commit in suggested_commits
+                      if any(h.id in commit.hunk_ids for h in file.hunks)]
+            if len(owners) != 1:
+                raise PlanValidationError(f"file operation must remain indivisible: {file.path_new or file.path_old}")
 
     # Verify per-file order is preserved across commits.
     for file in diff.files:

@@ -29,6 +29,7 @@ class GitDiffResult:
     raw_diff: str
     base_commit: Optional[str]
     target_commit: Optional[str]
+    parent_count: int = 1
 
 
 def _run_git(
@@ -50,12 +51,18 @@ def _run_git(
             cmd,
             cwd=cwd,
             check=False,
-            text=True,
             capture_output=True,
-            input=input_text,
+            input=input_text.encode("utf-8", "surrogateescape") if input_text is not None else None,
         )
     except OSError as exc:  # noqa: BLE001
         raise GitError(f"failed to execute git: {exc}") from exc
+
+    # Decode explicitly: subprocess text mode normalizes CRLF and cannot carry
+    # arbitrary non-UTF-8 source bytes. Surrogateescape is lossless on replay.
+    for name in ("stdout", "stderr"):
+        value = getattr(completed, name)
+        if isinstance(value, bytes):
+            setattr(completed, name, value.decode("utf-8", "surrogateescape"))
 
     if completed.returncode != 0:
         LOG.debug("git stderr: %s", completed.stderr)
@@ -76,19 +83,21 @@ def get_diff_for_commit(commit: str) -> GitDiffResult:
     parents), the diff is taken against the empty tree.
     """
 
-    target = _run_git(["rev-parse", commit]).stdout.strip()
+    target = _run_git(["rev-parse", "--verify", "--end-of-options", f"{commit}^{{commit}}"]).stdout.strip()
+    parents = _run_git(["rev-list", "--parents", "-n", "1", target]).stdout.split()[1:]
+    base = parents[0] if parents else None
+    if base:
+        args = ["diff", *_diff_options(), base, target, "--"]
+    else:
+        args = ["diff-tree", "--root", "--no-commit-id", "-p", *_diff_options(), target, "--"]
+    return GitDiffResult(_run_git(args).stdout, base, target, len(parents))
 
-    try:
-        base = _run_git(["rev-parse", f"{target}^"]).stdout.strip()
-        diff_args = ["diff", "--find-renames", f"{base}..{target}"]
-    except GitError:
-        # The commit likely has no parents (root commit). Compare
-        # against the empty tree.
-        base = None
-        diff_args = ["diff", "--root", "--find-renames", target]
 
-    diff_output = _run_git(diff_args).stdout
-    return GitDiffResult(raw_diff=diff_output, base_commit=base, target_commit=target)
+def _diff_options() -> list[str]:
+    """Use a machine-readable patch regardless of local diff configuration."""
+    return ["--no-ext-diff", "--no-textconv", "--no-color", "--no-relative",
+            "--src-prefix=a/", "--dst-prefix=b/", "--find-renames",
+            "--full-index", "--ignore-submodules=none", "--submodule=short", "--unified=3"]
 
 
 def get_diff_for_staged() -> GitDiffResult:
@@ -99,7 +108,7 @@ def get_diff_for_staged() -> GitDiffResult:
     """
 
     base = _run_git(["rev-parse", "HEAD"]).stdout.strip()
-    diff_output = _run_git(["diff", "--cached", "--find-renames"]).stdout
+    diff_output = _run_git(["diff", "--cached", *_diff_options(), "--"]).stdout
     return GitDiffResult(raw_diff=diff_output, base_commit=base, target_commit=None)
 
 

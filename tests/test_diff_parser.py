@@ -61,7 +61,7 @@ def test_render_partial_diff_round_trip():
 diff --git a/foo.py b/foo.py
 --- a/foo.py
 +++ b/foo.py
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,3 @@
  a = 1
 -b = 2
 +b = 3
@@ -83,7 +83,7 @@ def test_hunk_meta_language_and_symbol():
 diff --git a/foo.py b/foo.py
 --- a/foo.py
 +++ b/foo.py
-@@ -1,2 +1,3 @@ def foo
+@@ -1,2 +1,2 @@ def foo
 -a = 1
 +a = 2
  b = 3

@@ -48,10 +48,11 @@ def apply_plan(plan: Plan, config: Config) -> None:
     worktree_cwd = str(worktree)
     try:
         _run_git(["worktree", "add", "--detach", worktree_cwd, base], cwd=repo)
+        applied_hunks = set()
         for suggested in plan.suggested_commits:
             if not suggested.hunk_ids:
                 raise GitError(f"suggested commit {suggested.id} has no hunks")
-            patch = render_partial_diff(plan.diff, suggested.hunk_ids)
+            patch = render_partial_diff(plan.diff, suggested.hunk_ids, applied_hunk_ids=applied_hunks)
             if not patch.strip():
                 raise GitError(f"suggested commit {suggested.id} produced an empty patch")
             # Update both index and worktree so hooks see the current partial tree.
@@ -60,6 +61,7 @@ def apply_plan(plan: Plan, config: Config) -> None:
             if suggested.body:
                 message += f"\n\n{suggested.body}"
             create_commit(message, cwd=worktree_cwd)
+            applied_hunks.update(suggested.hunk_ids)
 
         expected_tree = _run_git(["rev-parse", f"{target}^{{tree}}"], cwd=repo).stdout.strip()
         actual_tree = _run_git(["rev-parse", "HEAD^{tree}"], cwd=worktree_cwd).stdout.strip()

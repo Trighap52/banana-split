@@ -39,6 +39,7 @@ class DiffHunk:
     header: str
     lines: List[DiffLine]
     meta: dict[str, Any] = field(default_factory=dict)
+    raw_patch: Optional[str] = None
 
 
 @dataclass
@@ -52,6 +53,10 @@ class FileDiff:
     change_type: Literal["add", "modify", "delete", "rename"]
     is_binary: bool
     hunks: List[DiffHunk] = field(default_factory=list)
+    raw_header: Optional[str] = None
+    raw_patch: Optional[str] = None
+    indivisible: bool = False
+    modes: Set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -101,4 +106,3 @@ class Plan:
     atomic_changes: List[AtomicChange] = field(default_factory=list)
     suggested_commits: List[SuggestedCommit] = field(default_factory=list)
     invariants_checked: bool = False
-

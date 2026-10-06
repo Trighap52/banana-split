@@ -18,7 +18,8 @@ commit.
 
 This is an early prototype, but already supports:
 
-- Parsing git diffs into structured files / hunks / lines.
+- Parsing Git diffs into structured files / hunks / lines while retaining
+  original patch bodies, newline markers, paths, and file metadata.
 - Grouping hunks into “atomic changes” per file and per symbol (function).
 - AST-based Python symbol extraction with fallback to hunk-header symbols.
 - Semantic atomization with lightweight dependency ordering (for example,
@@ -28,8 +29,10 @@ This is an early prototype, but already supports:
 - Simple interactive review (rename commit titles).
 - Replaying the original commit as multiple commits on a new branch,
   verifying the final tree matches the original.
-- Preflight safety checks for unsupported diff shapes before mutating
-  history.
+- Whole-file replay for additions, deletions, empty files, renames, and
+  permission changes, including operations with text edits.
+- Lossless replay of CRLF and non-UTF-8 text contents.
+- Preflight safety checks for unsupported diff shapes before replay starts.
 
 AI integration is stubbed out (the interface exists, but no real model
 call yet).
@@ -122,11 +125,21 @@ changes; banana-split will require `--dry-run` in this mode.
 When creating split commits, banana-split currently rejects:
 
 - root commits (commits without a parent),
-- commits containing binary file changes,
-- rename-only changes (file moved/renamed without text hunks), and
-- mode-only changes (permission bit updates without text hunks).
+- merge commits (commits with more than one parent),
+- commits containing binary file changes, and
+- submodule, symlink, or other non-regular-file changes, and
+- overlapping paths across separate file operations (for example, replacing
+  a directory with a file).
 
-Use `--dry-run` to inspect plans for these cases.
+Use `--dry-run` to inspect these cases. Binary changes remain opaque and do
+not produce replayable units.
+
+Supported regular-file operations include additions/deletions (including empty
+files), renames with or without edits, and executable permission changes. These
+operations remain indivisible during planning and review. Ordinary text hunks
+retain their exact bodies; replay adjusts their ranges for earlier split
+commits. Git external diff tools, text conversion, color, and custom prefixes
+are disabled when obtaining machine-readable patches.
 
 ## Evaluation harness
 
