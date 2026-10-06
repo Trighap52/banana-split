@@ -235,6 +235,6 @@ def run_split(config: Config) -> None:
     LOG.debug("Starting banana-split with config: %s", config)
 
     plan = build_plan(config)
-    reviewed_plan = review_plan(plan)
+    reviewed_plan = review_plan(plan, interactive=not config.dry_run)
 
     apply_plan(reviewed_plan, config)

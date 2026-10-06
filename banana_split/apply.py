@@ -1,145 +1,85 @@
-"""
-Application of a banana-split plan to a git repository.
-
-This module is responsible for turning a validated plan into either
-real git commits or a dry-run description.
-"""
+"""Build split history in isolation and publish only verified results."""
 
 from __future__ import annotations
 
 import logging
+import shutil
+import sys
+import tempfile
+from pathlib import Path
 
 from .config import Config
 from .diff_parser import render_partial_diff
 from .domain import Plan
 from .errors import GitError
-from .git_adapter import (
-    apply_patch,
-    create_branch,
-    create_commit,
-    delete_branch,
-    checkout,
-    ensure_repo_clean,
-    get_current_ref,
-    trees_equal,
-)
+from .git_adapter import _run_git, apply_patch, create_commit, ensure_repo_clean
 
 LOG = logging.getLogger(__name__)
 
 
 def apply_plan(plan: Plan, config: Config) -> None:
-    """
-    Apply the given plan according to the configuration.
-
-    In dry-run mode this prints a summary only. In non-dry-run mode it
-    creates a new branch starting from the diff's base commit and
-    applies each suggested commit as a partial patch, ensuring that the
-    final tree matches the original target commit.
-    """
-
+    """Replay in a detached worktree without changing the caller's checkout."""
     if config.dry_run:
-        LOG.info("Dry run: would apply %d commits", len(plan.suggested_commits))
-        for commit in plan.suggested_commits:
-            LOG.info(
-                "  Commit %s: %s (%d hunks)",
-                commit.id,
-                commit.title,
-                len(commit.hunk_ids),
-            )
+        print(f"Dry run: would create {len(plan.suggested_commits)} commits; no Git changes.")
         return
 
-    base = plan.diff.base_commit
-    target = plan.diff.target_commit
-
+    base, target = plan.diff.base_commit, plan.diff.target_commit
     if not base or not target:
         raise GitError(
             "cannot apply plan without both base and target commits; "
             "this mode currently supports only splitting real commits"
         )
 
+    # Validate again at the mutation boundary, including after review edits.
+    from .planner import _validate_and_order_plan
+
+    _validate_and_order_plan(plan)
     ensure_repo_clean()
-    original_ref = get_current_ref()
-
+    repo = _run_git(["rev-parse", "--show-toplevel"]).stdout.strip()
     branch_name = f"banana-split/split-{target[:7]}"
-    LOG.info(
-        "Creating new branch %s starting at base commit %s", branch_name, base
-    )
+    existing = _run_git(
+        ["for-each-ref", "--format=%(refname)", f"refs/heads/{branch_name}"], cwd=repo
+    ).stdout.strip()
+    if existing:
+        raise GitError(f"output branch {branch_name} already exists; choose another target or rename it")
 
-    branch_created = False
-    branch_checked_out = False
+    scratch = Path(tempfile.mkdtemp(prefix="banana-split-apply-"))
+    worktree = scratch / "worktree"
+    worktree_cwd = str(worktree)
     try:
-        # Create and check out the work branch. If the branch already
-        # exists, this will raise and surface an error to the user so they
-        # can clean it up or choose a different target.
-        create_branch(branch_name, base)
-        branch_created = True
-        checkout(branch_name)
-        branch_checked_out = True
-
+        _run_git(["worktree", "add", "--detach", worktree_cwd, base], cwd=repo)
         for suggested in plan.suggested_commits:
             if not suggested.hunk_ids:
-                continue
-
-            LOG.info("Applying suggested commit %s: %s", suggested.id, suggested.title)
+                raise GitError(f"suggested commit {suggested.id} has no hunks")
             patch = render_partial_diff(plan.diff, suggested.hunk_ids)
             if not patch.strip():
-                LOG.warning("Generated empty patch for commit %s; skipping", suggested.id)
-                continue
-
-            # Apply patch to the index only; the working tree will be
-            # synchronized with HEAD when the operation completes.
-            apply_patch(patch, index_only=True)
-
+                raise GitError(f"suggested commit {suggested.id} produced an empty patch")
+            # Update both index and worktree so hooks see the current partial tree.
+            apply_patch(patch, index_only=False, cwd=worktree_cwd)
             message = suggested.title
             if suggested.body:
-                message = f"{suggested.title}\n\n{suggested.body}"
-            create_commit(message)
+                message += f"\n\n{suggested.body}"
+            create_commit(message, cwd=worktree_cwd)
 
-        # Verify that the final tree matches the original target commit.
-        if not trees_equal(target, "HEAD"):
-            raise GitError(
-                "final tree does not match original commit after applying plan; "
-                "this indicates a bug in patch generation"
-            )
-    except Exception:
-        _rollback_partial_apply(
-            original_ref=original_ref,
-            branch_name=branch_name,
-            branch_created=branch_created,
-            branch_checked_out=branch_checked_out,
-        )
-        raise
-
-    LOG.info(
-        "Successfully applied plan on branch %s; final tree matches original commit %s",
-        branch_name,
-        target,
-    )
-
-
-def _rollback_partial_apply(
-    *,
-    original_ref: str,
-    branch_name: str,
-    branch_created: bool,
-    branch_checked_out: bool,
-) -> None:
-    """
-    Best-effort rollback when apply_plan fails mid-flight.
-    """
-
-    if branch_checked_out:
+        expected_tree = _run_git(["rev-parse", f"{target}^{{tree}}"], cwd=repo).stdout.strip()
+        actual_tree = _run_git(["rev-parse", "HEAD^{tree}"], cwd=worktree_cwd).stdout.strip()
+        if actual_tree != expected_tree:
+            raise GitError("final tree does not match original commit after applying plan")
+        result = _run_git(["rev-parse", "HEAD"], cwd=worktree_cwd).stdout.strip()
+    finally:
+        # finally also runs for KeyboardInterrupt. Retain recovery files if Git
+        # cleanup fails, instead of silently deleting a registered worktree.
+        unwinding = sys.exc_info()[0] is not None
         try:
-            checkout(original_ref)
-        except GitError as exc:
-            LOG.error(
-                "Failed to return to original ref %s during rollback: %s",
-                original_ref,
-                exc,
-            )
+            if worktree.exists():
+                _run_git(["worktree", "remove", "--force", worktree_cwd], cwd=repo)
+            shutil.rmtree(scratch)
+        except (GitError, OSError) as exc:
+            if not unwinding:
+                raise
+            LOG.error("Temporary worktree cleanup failed; recovery path %s: %s", scratch, exc)
 
-    if branch_created:
-        try:
-            delete_branch(branch_name, force=True)
-        except GitError as exc:
-            LOG.error("Failed to delete temporary branch %s: %s", branch_name, exc)
+    # Creating a branch never overwrites an existing ref, including one created
+    # concurrently while replay was running. No output branch exists on failure.
+    _run_git(["branch", branch_name, result], cwd=repo)
+    print(f"Created {branch_name}; final tree matches {target}. Current checkout unchanged.")

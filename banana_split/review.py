@@ -8,15 +8,11 @@ editing will be added later.
 
 from __future__ import annotations
 
-import logging
 import sys
 
 from .domain import Plan
 
-LOG = logging.getLogger(__name__)
-
-
-def review_plan(plan: Plan) -> Plan:
+def review_plan(plan: Plan, *, interactive: bool = True) -> Plan:
     """
     Present a summary of the plan to the user and allow for edits.
 
@@ -25,24 +21,18 @@ def review_plan(plan: Plan) -> Plan:
     titles. More advanced editing will be added later.
     """
 
-    LOG.info("Plan contains %d suggested commits", len(plan.suggested_commits))
+    print(f"Plan contains {len(plan.suggested_commits)} suggested commits")
     for idx, commit in enumerate(plan.suggested_commits, start=1):
-        LOG.info(
-            "  [%d] %s (%d hunks) id=%s",
-            idx,
-            commit.title,
-            len(commit.hunk_ids),
-            commit.id,
-        )
+        print(f"  [{idx}] {commit.title} ({len(commit.hunk_ids)} hunks) id={commit.id}")
 
-    if not sys.stdin.isatty():
+    if not interactive or not sys.stdin.isatty():
         # Non-interactive environment: return the plan as-is.
         return plan
 
     try:
         answer = input("Do you want to rename any commit titles? [y/N] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        return plan
+    except EOFError:
+        raise KeyboardInterrupt from None
 
     if answer not in {"y", "yes"}:
         return plan
@@ -51,8 +41,8 @@ def review_plan(plan: Plan) -> Plan:
         prompt = f"New title for commit [{idx}] (current: {commit.title!r}, press Enter to keep): "
         try:
             new_title = input(prompt)
-        except (EOFError, KeyboardInterrupt):
-            break
+        except EOFError:
+            raise KeyboardInterrupt from None
         if new_title.strip():
             commit.title = new_title.strip()
 
