@@ -9,6 +9,15 @@ Versioning when stable releases begin.
 
 ### Added
 
+- Explicit plan/review/apply commands with versioned JSON grouping manifests,
+  immutable Git object binding, patch fingerprints, and authoritative import.
+- Structural review actions for patch inspection, renaming, merging, splitting,
+  moving units and valid reordering, with atomic saves and cancellation.
+- Shared validation of exact coverage, inferred dependencies and commit messages
+  before edits are saved or plans are applied.
+- Managed plan storage inside Git metadata, with protections against overwriting
+  tracked source files and unrelated Git metadata.
+
 - Evaluation harness with corpus-driven metrics.
 - Semantic atomizer with lightweight dependency ordering.
 - Open source project community and governance baseline files.
@@ -43,3 +52,8 @@ Versioning when stable releases begin.
 - Count clone/planning failures in tree-equality success rates and validate case
   results directly in the report gate; reject non-finite metrics and missing
   dependency evidence.
+
+### Changed
+
+- The bare CLI command is now read-only. Use `apply PLAN` or the legacy explicit
+  `--apply` flag to create commits.

@@ -26,7 +26,9 @@ This is an early prototype, but already supports:
   source-before-test when signals match).
 - Import-based source-to-test dependency linking for Python changes.
 - Building a plan of suggested commits.
-- Simple interactive review (rename commit titles).
+- Versioned plans with immutable commit/tree binding and validated import.
+- Structural review: inspect patches, rename, merge, split, move units, and
+  reorder commits when coverage and dependency constraints allow.
 - Replaying the original commit as multiple commits on a new branch,
   verifying the final tree matches the original.
 - Whole-file replay for additions, deletions, empty files, renames, and
@@ -71,42 +73,87 @@ banana-split --help
 > worktree, then published on a new branch after verification. Your current
 > branch, index, and working files remain unchanged.
 
-### Split a specific commit
+### Plan, review, then apply
 
-From inside a git repository:
+From inside a Git repository:
+
+```bash
+uv run banana-split plan <commit-sha>
+```
+
+This analyzes one supported commit, displays its change units, and saves a
+versioned JSON plan under the current worktree's managed Git metadata directory:
+`<git-dir>/banana-split/plans/<full-sha>.json`. It prints the full plan path and
+the commands to review and apply it. The default location keeps the repository
+clean. Use `--output /tmp/split-plan.json` for a portable plan outside the repo,
+or `--json` to print JSON without saving. Existing exports are preserved unless
+you explicitly use `plan --overwrite`; review edits intentionally update their
+input artifact. Commits with no changes cannot be exported as replayable plans.
+
+Use the printed path as `PLAN` in these examples:
+
+```bash
+uv run banana-split review PLAN
+uv run banana-split review PLAN --show 1
+uv run banana-split review PLAN --rename 1 "Fix request parsing"
+uv run banana-split review PLAN --merge 1 2
+uv run banana-split review PLAN --move 'service.py::ac0' 2
+uv run banana-split review PLAN --split 1 'service.py::ac0'
+uv run banana-split review PLAN --order 2,1,3
+uv run banana-split apply PLAN
+```
+
+Commit numbers are one-based. Unit IDs are printed by `plan` and `review`.
+Each flag performs one edit; use separate invocations to make several edits.
+Edits update the plan file atomically, or use `--output PATH` to save a copy.
+Moving the last unit out of a commit removes that empty commit. Splitting
+extracts one complete unit into a new commit immediately after its source.
+Merge keeps the earlier commit's title and combines its bodies.
+
+On a terminal, `review PLAN` provides the same actions as commands:
+`show`, `rename`, `merge`, `move`, `split`, and `order`. Type `save` to write
+approved edits or `quit` to discard them. Ctrl+C or EOF also discards unsaved
+edits. Without a terminal, plain `review PLAN` only displays the plan.
+
+Invalid edits are rejected without changing the plan. Every unit must appear
+exactly once; per-file hunk order, file-operation boundaries, and inferred
+source/test dependencies must remain valid. Dependent changes may share a
+commit. These are static constraints, not proof that intermediate commits pass
+tests; configurable per-commit checks are tracked in the next milestone.
+
+Saved plans contain grouping and commit messages, not patch text. On import,
+banana-split reconstructs changes from Git and verifies the immutable base,
+target, target tree, original patch fingerprint, and unit definitions. Moving
+`HEAD` after planning does not retarget a saved plan. Plans can be transferred
+to a clone containing the same objects. Unavailable objects or altered or
+incompatible definitions fail before replay. Regenerate a plan if its fingerprint or
+unit definitions change after a tool upgrade or diff-configuration change.
+Plan output cannot overwrite tracked source files or arbitrary Git metadata.
+Custom plans inside the repository should be ignored by Git; apply still
+requires a clean repository.
+
+`apply PLAN` intentionally writes commits without prompting. It revalidates the
+plan, replays in a detached temporary worktree, compares the exact final tree,
+and publishes `banana-split/split-<short-sha>` only after cleanup. Your current
+checkout, index, and working files remain unchanged. Existing output branches
+are never overwritten. Replay failure or Ctrl+C cleans up without publishing a
+branch; cleanup failures report the recovery path.
+
+### Read-only inspection and dry runs
 
 ```bash
 uv run banana-split <commit-sha>
+uv run banana-split plan <commit-sha> --dry-run
+uv run banana-split review PLAN --merge 1 2 --dry-run
+uv run banana-split apply PLAN --dry-run
 ```
 
-banana-split will:
-
-- Inspect the diff between `<commit-sha>` and its parent.
-- Propose a series of smaller commits.
-- Ask if you want to rename commit titles.
-- Replay the original diff in a detached temporary worktree.
-- Verify that the final tree object matches `<commit-sha>` exactly.
-- Remove the temporary worktree and create `banana-split/split-<short-sha>`.
-
-Your current checkout, original branch, and commit remain unchanged. To inspect
-the result, explicitly check out the printed output branch. Existing output
-branches are never overwritten.
-
-Ctrl+C during review or replay aborts the operation. Replay failures clean up
-the temporary worktree without publishing a branch. If cleanup itself fails,
-the error includes the recovery path. Non-interactive runs currently apply
-the displayed plan directly; explicit plan/apply commands are tracked for v1.
-
-### Dry-run (no git changes)
-
-To see what banana-split would do without touching history:
+The bare command now inspects only. Dry runs never prompt or save a file or Git
+ref. The legacy one-step workflow remains available explicitly:
 
 ```bash
-uv run banana-split <commit-sha> --dry-run
+uv run banana-split <commit-sha> --apply
 ```
-
-This prints a summary at default verbosity without prompting or creating
-any branches or commits.
 
 ### Split staged changes (experimental)
 
@@ -237,7 +284,11 @@ The main modules are:
 - `banana_split.analysis` – static heuristics and language-aware helpers.
 - `banana_split.ai` – AI-assisted reasoning for commit boundaries.
 - `banana_split.planner` – orchestrates analysis and plan construction.
-- `banana_split.review` – user-facing review and editing of plans.
+- `banana_split.workflow` – explicit plan/review/apply commands.
+- `banana_split.plan_store` – versioned manifests and authoritative Git rebuild.
+- `banana_split.plan_editor` – transactional structural review edits.
+- `banana_split.validation` – shared coverage/order/dependency invariants.
+- `banana_split.review` – human-readable plan summaries and legacy review.
 - `banana_split.apply` – applies a plan as actual git commits or a dry run.
 - `banana_split.eval` – corpus-driven benchmarking and quality metrics.
 

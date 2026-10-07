@@ -62,6 +62,15 @@ def atomize_semantically(diff: Diff) -> List[AtomicChange]:
     ]
 
 
+def dependency_pairs(diff: Diff) -> set[tuple[str, str]]:
+    """Return dependency boundaries as hunk IDs for validating edited plans."""
+    nodes, by_file, by_symbol, by_module, by_import = _build_nodes(diff, _build_hunk_order(diff))
+    edges = _build_dependencies(nodes, by_file, by_symbol, by_module, by_import)
+    lookup = {node.id: node for node in nodes}
+    return {(lookup[src].hunk_ids[-1], lookup[dst].hunk_ids[0])
+            for src, targets in edges.items() for dst in targets}
+
+
 def _build_hunk_order(diff: Diff) -> Dict[str, int]:
     order: Dict[str, int] = {}
     i = 0

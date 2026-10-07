@@ -25,6 +25,10 @@ def review_plan(plan: Plan, *, interactive: bool = True) -> Plan:
     for idx, commit in enumerate(plan.suggested_commits, start=1):
         print(f"  [{idx}] {commit.title} ({len(commit.hunk_ids)} hunks) id={commit.id}")
 
+    for file in plan.diff.files:
+        if file.is_binary:
+            print(f"  Binary change: {file.path_new or file.path_old!r} (preview only; cannot apply)")
+
     if not interactive or not sys.stdin.isatty():
         # Non-interactive environment: return the plan as-is.
         return plan
