@@ -130,12 +130,13 @@ def run_evaluation(
         try:
             with tempfile.TemporaryDirectory(prefix="banana-split-eval-") as tmpdir:
                 repo_dir = Path(tmpdir) / "repo"
-                _clone_repo(case, repo_dir)
+                resolved_target = _clone_repo(case, repo_dir)
+                case_report["resolved_target"] = resolved_target
                 _configure_git_identity(repo_dir)
 
                 with _pushd(repo_dir):
                     config = Config(
-                        target=case.target,
+                        target=resolved_target,
                         use_staged=False,
                         dry_run=False,
                         use_ai=use_ai,
@@ -181,7 +182,8 @@ def run_evaluation(
         "apply_attempted_cases": apply_attempted_cases,
         "apply_failures": apply_failures,
         "successful_cases": successful_cases,
-        "tree_equal_success_rate": _ratio(successful_cases, apply_attempted_cases),
+        "tree_equal_success_rate": _ratio(successful_cases, len(cases)),
+        "apply_tree_equal_success_rate": _ratio(successful_cases, apply_attempted_cases),
         "apply_failure_rate": _ratio(apply_failures, apply_attempted_cases),
         "avg_suggested_commits_per_planned_case": _ratio(
             total_suggested_commits,
@@ -277,12 +279,25 @@ def print_evaluation_summary(report: Dict[str, Any], out: Optional[TextIO] = Non
     stream.write("\n".join(lines) + "\n")
 
 
-def _clone_repo(case: EvalCase, dest: Path) -> None:
+def _clone_repo(case: EvalCase, dest: Path) -> str:
+    """Fetch the selected commit and parent independently of branch clone depth."""
     cmd = ["git", "clone", "--depth", str(case.clone_depth)]
     if case.branch:
         cmd.extend(["--branch", case.branch])
-    cmd.extend([case.repo_url, str(dest)])
+    cmd.extend(["--", case.repo_url, str(dest)])
     _run_subprocess(cmd, cwd=None)
+    try:
+        selected = _run_subprocess(
+            ["git", "rev-parse", "--verify", "--end-of-options", f"{case.target}^{{commit}}"],
+            cwd=dest,
+        ).stdout.strip()
+    except RuntimeError:
+        # Pinned SHAs and remote refs may lie outside the initial shallow clone.
+        selected = case.target
+    _run_subprocess(["git", "fetch", "--depth", "2", "--", "origin", selected], cwd=dest)
+    return _run_subprocess(
+        ["git", "rev-parse", "--verify", "FETCH_HEAD^{commit}"], cwd=dest
+    ).stdout.strip()
 
 
 def _configure_git_identity(repo_dir: Path) -> None:

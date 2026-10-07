@@ -169,7 +169,8 @@ make eval EVAL_CORPUS=examples/eval_corpus_v1.json
 
 This executes each corpus case in a fresh temporary clone and reports:
 
-- tree-equal success rate,
+- end-to-end tree-equal success rate over all cases (including clone/planning failures),
+- conditional tree-equal success rate over cases that reached apply,
 - apply failure rate,
 - average suggested commit size (commits/case, hunks/commit, files/commit),
 - cohesion proxies (single-file ratio, single-symbol ratio, cohesion score),
@@ -189,6 +190,11 @@ Corpus entries support:
 - `target` (commit-ish, default `HEAD`),
 - `branch` (optional branch for clone), and
 - `clone_depth` (optional positive integer, default `200`).
+
+The selected target and its parent are fetched separately at depth two, so
+pinned commits remain usable after they leave the initial branch clone window.
+Reports record the resolved target SHA. Commit expressions such as `HEAD~5`
+must resolve within the initial clone; increase `clone_depth` when needed.
 
 Curated corpus entries may also include descriptive metadata fields such
 as `rationale`; unknown fields are ignored by the loader.
@@ -213,10 +219,12 @@ CI integration:
 - `.github/workflows/eval.yml` runs the curated corpus benchmark on pull requests.
 - It uploads `artifacts/eval-report.json` as a build artifact.
 - It enforces hard gates:
-  - `tree_equal_success_rate >= 1.0`
+  - `tree_equal_success_rate >= 1.0` over all corpus cases
   - `dependency_order_satisfaction >= 0.80`
-- Gate output includes `satisfied_dependency_pairs` vs
-  `expected_dependency_pairs`.
+- Gate output includes successful vs total cases and `satisfied_dependency_pairs`
+  vs `expected_dependency_pairs`. It checks case results directly so older reports
+  with inflated conditional rates cannot pass. A dependency gate requires
+  non-zero evaluated pairs.
 
 ## Design overview
 
