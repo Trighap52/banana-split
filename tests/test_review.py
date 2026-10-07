@@ -32,7 +32,7 @@ def test_cancellation_during_review_never_applies(plan, monkeypatch, rename, exc
         raise exception
 
     monkeypatch.setattr("builtins.input", answer)
-    assert cli.main([]) == 130
+    assert cli.main(["--apply"]) == 130
     assert applied == []
 
 

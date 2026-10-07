@@ -74,7 +74,7 @@ def test_cli_splits_commit_in_temporary_repo(tmp_path):
     env["PYTHONPATH"] = str(project_root)
 
     result = subprocess.run(
-        [sys.executable, "-m", "banana_split.cli", orig_head],
+        [sys.executable, "-m", "banana_split.cli", orig_head, "--apply"],
         cwd=str(repo),
         env=env,
         text=True,

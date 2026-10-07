@@ -26,6 +26,10 @@ has passed for each one.
 | P1 | [#28 Honest evaluation](https://github.com/Trighap52/banana-split/issues/28) | All-case success and caller preservation are gated independently; deterministic offline fixtures provide the baseline |
 | P2 | [#29 Release readiness](https://github.com/Trighap52/banana-split/issues/29) | Supported runtimes pass CI; wheel/sdist install cleanly; documented CLI workflow works from a fresh installation |
 
+The explicit workflow now saves manifests in managed Git metadata, rebuilds
+patches from immutable objects on import, and validates structural edits before
+saving or applying. The bare CLI command is read-only.
+
 Ship each milestone through focused PRs. Test failure paths with real Git
 repositories, not only mocked adapter functions. Add regressions alongside the
 behavior they protect. Keep real-repository benchmarks supplemental to the

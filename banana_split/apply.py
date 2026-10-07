@@ -13,6 +13,7 @@ from .diff_parser import render_partial_diff
 from .domain import Plan
 from .errors import GitError
 from .git_adapter import _run_git, apply_patch, create_commit, ensure_repo_clean
+from .validation import validate_plan
 
 LOG = logging.getLogger(__name__)
 
@@ -31,9 +32,9 @@ def apply_plan(plan: Plan, config: Config) -> None:
         )
 
     # Validate again at the mutation boundary, including after review edits.
-    from .planner import _validate_and_order_plan
-
-    _validate_and_order_plan(plan)
+    validate_plan(plan)
+    if not plan.suggested_commits:
+        raise GitError("target has no replayable changes to split")
     ensure_repo_clean()
     repo = _run_git(["rev-parse", "--show-toplevel"]).stdout.strip()
     branch_name = f"banana-split/split-{target[:7]}"
