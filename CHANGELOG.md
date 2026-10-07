@@ -47,6 +47,12 @@ Versioning when stable releases begin.
 - Obtain machine-readable Git patches independently of local diff display
   settings, external diff tools, and text conversion.
 
+- Fetch pinned evaluation targets and their parents independently of the initial
+  branch clone depth, and record resolved commit IDs in reports.
+- Count clone/planning failures in tree-equality success rates and validate case
+  results directly in the report gate; reject non-finite metrics and missing
+  dependency evidence.
+
 ### Changed
 
 - The bare CLI command is now read-only. Use `apply PLAN` or the legacy explicit

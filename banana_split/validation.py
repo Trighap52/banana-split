@@ -78,7 +78,7 @@ def validate_plan(plan: Plan) -> None:
 
     # File operations (rename/mode/add/delete) must be selected in one commit.
     for file in diff.files:
-        if file.indivisible:
+        if file.indivisible and file.hunks:
             operation_owners = [commit for commit in suggested_commits
                                 if any(h.id in commit.hunk_ids for h in file.hunks)]
             if len(operation_owners) != 1:

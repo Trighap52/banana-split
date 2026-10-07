@@ -313,3 +313,14 @@ def test_managed_plan_storage_and_apply_in_linked_worktree(repo, tmp_path, monke
     assert (index.read_bytes(), git(linked, 'rev-parse', 'HEAD'),
             git(linked, 'worktree', 'list', '--porcelain')) == before
     assert git(linked, '--no-optional-locks', 'status', '--porcelain') == b''
+
+
+def test_bare_inspection_can_report_opaque_binary_changes(repo):
+    (repo / 'blob.bin').write_bytes(b'\x00\x01')
+    git(repo, 'add', 'blob.bin')
+    git(repo, 'commit', '-m', 'binary')
+    before = state(repo)
+    result = invoke(repo, '--dry-run')
+    assert 'Binary change:' in result.stdout
+    assert 'cannot apply' in result.stdout
+    assert state(repo) == before
