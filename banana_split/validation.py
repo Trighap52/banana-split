@@ -102,4 +102,3 @@ def validate_plan(plan: Plan) -> None:
             raise PlanValidationError(
                 f"plan reorders hunks for file {path}; expected {expected}, got {sequence}"
             )
-
