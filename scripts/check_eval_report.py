@@ -7,18 +7,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Any
 
 
 def _as_float(value: Any, field: str) -> float:
-    if isinstance(value, (int, float)):
+    if not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value) and 0 <= value <= 1:
         return float(value)
-    raise ValueError(f"report summary field '{field}' must be numeric, got {type(value).__name__}")
+    raise ValueError(f"report summary field '{field}' must be a finite ratio between zero and one, got {type(value).__name__}")
 
 
 def _as_int(value: Any, field: str) -> int:
-    if isinstance(value, int):
+    if type(value) is int:
         return value
     if isinstance(value, float) and value.is_integer():
         return int(value)
@@ -34,7 +35,7 @@ def _collect_failing_cases(report: dict[str, Any]) -> list[str]:
     for case in cases:
         if not isinstance(case, dict):
             continue
-        if case.get("tree_equal") is True:
+        if case.get("status") == "success" and case.get("tree_equal") is True:
             continue
 
         name = str(case.get("name", "<unnamed-case>"))
@@ -81,6 +82,9 @@ def main() -> int:
         ),
     )
     args = parser.parse_args()
+    for threshold in (args.min_tree_equal, args.min_dependency_order):
+        if threshold is not None and (not math.isfinite(threshold) or not 0 <= threshold <= 1):
+            parser.error("thresholds must be finite numbers between zero and one")
 
     report_path = Path(args.report).resolve()
     if not report_path.exists():
@@ -99,6 +103,18 @@ def main() -> int:
         tree_equal = _as_float(summary.get("tree_equal_success_rate"), "tree_equal_success_rate")
     except Exception as exc:  # noqa: BLE001
         raise SystemExit(str(exc)) from exc
+
+    cases = report.get("cases")
+    if not isinstance(cases, list) or not cases or any(not isinstance(c, dict) for c in cases):
+        raise SystemExit("report must include a non-empty list of case results")
+    total = _as_int(summary.get("total_cases", len(cases)), "total_cases")
+    successful = sum(c.get("status") == "success" and c.get("tree_equal") is True for c in cases)
+    if total != len(cases) or total <= 0:
+        raise SystemExit("report total_cases does not match case results")
+    if "successful_cases" in summary and _as_int(summary["successful_cases"], "successful_cases") != successful:
+        raise SystemExit("report successful_cases does not match case results")
+    # Also reject inflated reports produced by the old conditional denominator.
+    tree_equal = min(tree_equal, successful / total)
 
     dependency_order: float | None = None
     if "dependency_order_satisfaction" in summary:
@@ -126,7 +142,14 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             raise SystemExit(str(exc)) from exc
 
+    if expected_pairs is not None and satisfied_pairs is not None:
+        if not 0 <= satisfied_pairs <= expected_pairs:
+            raise SystemExit("invalid dependency pair counts")
+        if dependency_order is not None and expected_pairs > 0:
+            dependency_order = min(dependency_order, satisfied_pairs / expected_pairs)
+
     print(f"Eval report: {report_path}")
+    print(f"successful_cases={successful}/{total}")
     print(f"tree_equal_success_rate={tree_equal:.3f} (required >= {args.min_tree_equal:.3f})")
     if expected_pairs is not None and satisfied_pairs is not None:
         print(f"dependency_pairs={satisfied_pairs}/{expected_pairs}")
@@ -136,6 +159,8 @@ def main() -> int:
                 "report summary does not include dependency_order_satisfaction "
                 "but --min-dependency-order was requested"
             )
+        if expected_pairs is None or satisfied_pairs is None or expected_pairs == 0:
+            raise SystemExit("dependency gate requires non-zero evaluated dependency pairs")
         print(
             "dependency_order_satisfaction="
             f"{dependency_order:.3f} (required >= {args.min_dependency_order:.3f})"

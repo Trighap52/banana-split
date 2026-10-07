@@ -37,3 +37,9 @@ Versioning when stable releases begin.
   compute root-commit previews against the empty tree.
 - Obtain machine-readable Git patches independently of local diff display
   settings, external diff tools, and text conversion.
+
+- Fetch pinned evaluation targets and their parents independently of the initial
+  branch clone depth, and record resolved commit IDs in reports.
+- Count clone/planning failures in tree-equality success rates and validate case
+  results directly in the report gate; reject non-finite metrics and missing
+  dependency evidence.

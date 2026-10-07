@@ -261,3 +261,34 @@ def test_run_evaluation_on_local_repo(tmp_path):
     assert summary["successful_cases"] == 1
     assert summary["tree_equal_success_rate"] == 1.0
     assert summary["apply_failure_rate"] == 0.0
+
+
+def test_pinned_old_commit_is_fetched_outside_initial_clone_depth(tmp_path):
+    from banana_split.eval.harness import EvalCase, _clone_repo
+    source = tmp_path / 'source'
+    source.mkdir()
+    _run_git(['init'], cwd=source)
+    _run_git(['config', 'user.name', 'Eval'], cwd=source)
+    _run_git(['config', 'user.email', 'eval@example.com'], cwd=source)
+    targets = []
+    for value in range(5):
+        (source / 'value.py').write_text(f'value = {value}\n')
+        _run_git(['add', '.'], cwd=source)
+        _run_git(['commit', '-m', f'value {value}'], cwd=source)
+        targets.append(_run_git(['rev-parse', 'HEAD'], cwd=source).stdout.strip())
+    clone = tmp_path / 'clone'
+    resolved = _clone_repo(EvalCase('old', source.as_uri(), targets[1], clone_depth=1), clone)
+    assert resolved == targets[1]
+    assert _run_git(['rev-parse', resolved + '^'], cwd=clone).stdout.strip() == targets[0]
+    corpus = tmp_path / 'corpus.json'
+    corpus.write_text(json.dumps({'cases': [
+        {'name': 'valid-old', 'repo_url': source.as_uri(), 'target': targets[1], 'clone_depth': 1},
+        {'name': 'missing-target', 'repo_url': source.as_uri(), 'target': '0' * 40, 'clone_depth': 1},
+    ]}))
+    report = run_evaluation(corpus_path=str(corpus), use_ai=False, verbosity=0)
+    assert report['summary']['total_cases'] == 2
+    assert report['summary']['successful_cases'] == 1
+    assert report['summary']['plan_build_failures'] == 1
+    assert report['summary']['tree_equal_success_rate'] == 0.5
+    assert report['summary']['apply_tree_equal_success_rate'] == 1.0
+    assert report['cases'][0]['resolved_target'] == targets[1]

@@ -110,3 +110,34 @@ def test_check_eval_report_requires_dependency_metric_when_gate_enabled(tmp_path
     proc = _run_gate(report_path, "--min-dependency-order", "0.8")
     assert proc.returncode == 1
     assert "does not include dependency_order_satisfaction" in proc.stderr
+
+
+def test_gate_rejects_inflated_rate_that_excludes_planning_failures(tmp_path):
+    path = tmp_path / 'report.json'
+    path.write_text(json.dumps({'summary': {'total_cases': 2, 'successful_cases': 1,
+                                          'tree_equal_success_rate': 1.0},
+                               'cases': [{'name': 'ok', 'status': 'success', 'tree_equal': True},
+                                         {'name': 'missing', 'status': 'plan_build_failed', 'tree_equal': False}]}))
+    result = _run_gate(path)
+    assert result.returncode == 1
+    assert 'successful_cases=1/2' in result.stdout
+    assert 'tree_equal_success_rate=0.500' in result.stdout
+    assert 'missing (plan_build_failed)' in result.stdout
+
+
+def test_gate_rejects_nonfinite_metrics(tmp_path):
+    path = tmp_path / 'report.json'
+    path.write_text(json.dumps({'summary': {'tree_equal_success_rate': float('nan')},
+                               'cases': [{'status': 'success', 'tree_equal': True}]}))
+    assert _run_gate(path).returncode != 0
+
+
+def test_gate_rejects_zero_dependency_evidence(tmp_path):
+    path = tmp_path / 'report.json'
+    path.write_text(json.dumps({'summary': {'tree_equal_success_rate': 1.0,
+                                          'dependency_order_satisfaction': 1.0,
+                                          'expected_dependency_pairs': 0, 'satisfied_dependency_pairs': 0},
+                               'cases': [{'status': 'success', 'tree_equal': True}]}))
+    result = _run_gate(path, '--min-dependency-order', '0.8')
+    assert result.returncode == 1
+    assert 'non-zero evaluated dependency pairs' in result.stderr
